@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>TOPUP APPS AGENT – Sales Action Center</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiVE9QVVAgQVBQUyBBR0VOVCBTYWxlcyBBY3Rpb24gQ2VudGVyIiwic2hvcnRfbmFtZSI6IlRvcHVwIEFnZW50IiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJzdGFydF91cmwiOiIuLyIsImJhY2tncm91bmRfY29sb3IiOiIjZjhmYWZjIiwidGhlbWVfY29sb3IiOiIjMGYxNzJhIn0=" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html,body{margin:0;padding:0;background:#f8fafc;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  input[type="range"]{accent-color:#0f172a;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, useCallback, useRef } = React;
+
+/* ============================================================================
+   ICONS (self-contained, no external icon library)
+============================================================================ */
+function Icon({ name, size = 16, className = "" }) {
+  const P = {
+    home: <><path d="M3 11l9-8 9 8" /><path d="M5 9.5V21h14V9.5" /></>,
+    target: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></>,
+    users: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20c0-3.5 2.5-6 5.5-6s5.5 2.5 5.5 6" /><circle cx="17.5" cy="9.5" r="2.4" /><path d="M15.8 14.4c2.3.5 3.7 2.6 3.7 5.6" /></>,
+    refresh: <><path d="M20 12a8 8 0 10-2.5 5.8" /><path d="M20 6v6h-6" /></>,
+    chart: <><rect x="4" y="12" width="4" height="8" /><rect x="10" y="7" width="4" height="13" /><rect x="16" y="3" width="4" height="17" /></>,
+    settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 13.5a7.9 7.9 0 000-3l2-1.5-2-3.4-2.3.9a8 8 0 00-2.6-1.5L14 2h-4l-.5 2.5a8 8 0 00-2.6 1.5l-2.3-.9-2 3.4 2 1.5a7.9 7.9 0 000 3l-2 1.5 2 3.4 2.3-.9c.8.7 1.7 1.2 2.6 1.5L10 22h4l.5-2.5c.9-.3 1.8-.8 2.6-1.5l2.3.9 2-3.4-2-1.5z" /></>,
+    phone: <path d="M6.5 2h3l1.4 4.7-2 1.6a12.5 12.5 0 006.3 6.3l1.6-2 4.7 1.4v3a2 2 0 01-2.2 2A18 18 0 014.5 4.2 2 2 0 016.5 2z" />,
+    message: <path d="M4 5h16v11H8l-4 4V5z" />,
+    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="M20 20l-4.3-4.3" /></>,
+    x: <><path d="M5 5l14 14" /><path d="M19 5L5 19" /></>,
+    upload: <><path d="M12 16V4" /><path d="M6 9l6-6 6 6" /><path d="M4 19h16" /></>,
+    sparkles: <><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z" /><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" /></>,
+    shield: <path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z" />,
+    trendingUp: <><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,
+    menu: <><path d="M3 6h18" /><path d="M3 12h18" /><path d="M3 18h18" /></>,
+    creditCard: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18" /></>,
+    clipboard: <><rect x="6" y="4" width="12" height="16" rx="2" /><rect x="9" y="2" width="6" height="4" rx="1" /></>,
+    award: <><circle cx="12" cy="8" r="5" /><path d="M9 12.5L7 21l5-3 5 3-2-8.5" /></>,
+    arrowUpDown: <><path d="M8 3v14" /><path d="M4 13l4 4 4-4" /><path d="M16 21V7" /><path d="M20 11l-4-4-4 4" /></>,
+    file: <><path d="M6 2h9l5 5v15H6V2z" /><path d="M15 2v5h5" /></>,
+    check: <path d="M4 12l5 5L20 6" />,
+    alertTriangle: <><path d="M12 3l10 18H2L12 3z" /><path d="M12 9v5" /><path d="M12 17h.01" /></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {P[name]}
+    </svg>
+  );
+}
+
+/* ============================================================================
+   CONSTANTS
+============================================================================ */
+const SHEET_NAME = "TOPUP APPS AGENT";
+const DATA_START_ROW_INDEX = 10; // Row 11
+const COL = { EMAIL: 1, STATUS: 4, AGENT: 6, PHONE: 7, SCHOOL: 12, SALES: 14, GROUP: 16, CREDIT: 17, RELOAD_DATE: 18, RELOAD_AMT: 19, STATE_OFFICER: 13 };
+
+
+const ACTIVITY_META = {
+  ACTIVE: { label: "Active", color: "emerald" },
+  LOW_ACTIVITY: { label: "Low Activity", color: "amber" },
+  AT_RISK: { label: "At Risk", color: "orange" },
+  INACTIVE: { label: "Inactive", color: "red" },
+  NO_RELOAD_RECORD: { label: "No Reload Record", color: "slate" },
+  DATA_REVIEW: { label: "Data Review", color: "yellow" },
+};
+const SALES_META = {
+  TOP_PERFORMER: { label: "Top Performer", color: "violet" },
+  HIGH_VALUE: { label: "High Value", color: "rose" },
+  MEDIUM_VALUE: { label: "Medium Value", color: "emerald" },
+  LOW_VALUE: { label: "Low Value", color: "amber" },
+  ZERO: { label: "Zero Sales", color: "slate" },
+  UNKNOWN: { label: "No Data", color: "slate" },
+};
+const CREDIT_META = {
+  LOW: { label: "Low Credit", color: "red" },
+  MEDIUM: { label: "Medium Credit", color: "orange" },
+  HEALTHY: { label: "Healthy Credit", color: "emerald" },
+  HIGH: { label: "High Credit", color: "blue" },
+  UNKNOWN: { label: "No Data", color: "slate" },
+};
+const PRIORITY_META = {
+  CRITICAL: { label: "Critical", color: "red" },
+  HIGH: { label: "High", color: "orange" },
+  MEDIUM: { label: "Medium", color: "amber" },
+  LOW: { label: "Low", color: "emerald" },
+};
+const ACTION_META = {
+  CALL: { label: "Call Agent", icon: "phone" },
+  WHATSAPP: { label: "WhatsApp Follow-Up", icon: "message" },
+  RELOAD: { label: "Suggest Reload", icon: "creditCard" },
+  REACTIVATE: { label: "Reactivation", icon: "refresh" },
+  TRAINING: { label: "Training Required", icon: "clipboard" },
+  INVESTIGATE: { label: "Investigate Low Sales", icon: "search" },
+  UPSELL: { label: "Upsell Opportunity", icon: "trendingUp" },
+  UPDATE_INFO: { label: "Update Agent Information", icon: "shield" },
+  NONE: { label: "No Action Needed", icon: "check" },
+};
+const CATEGORY_ORDER = ["URGENT_RELOAD", "HIGH_VALUE_AT_RISK", "LOW_CREDIT_FOLLOWUP", "INACTIVE", "LOW_ACTIVITY", "ZERO_SALES", "HIGH_POTENTIAL"];
+const CATEGORY_META = {
+  URGENT_RELOAD: { label: "Urgent Reload", color: "red", icon: "🔴" },
+  HIGH_VALUE_AT_RISK: { label: "High Value At Risk", color: "orange", icon: "🔥" },
+  LOW_CREDIT_FOLLOWUP: { label: "Low Credit Follow-Up", color: "orange", icon: "🟠" },
+  LOW_ACTIVITY: { label: "Low Activity", color: "amber", icon: "🟡" },
+  INACTIVE: { label: "Inactive", color: "red", icon: "🔴" },
+  HIGH_POTENTIAL: { label: "High Potential", color: "violet", icon: "⭐" },
+  ZERO_SALES: { label: "Zero Sales", color: "slate", icon: "⚪" },
+};
+const DEFAULT_SETTINGS = { activeDays: 30, lowDays: 60, atRiskDays: 90, weights: { sales: 30, recency: 25, credit: 20, status: 10, reloadAmt: 10, risk: 5 } };
+const FOLLOWUP_STATUSES = ["Pending", "Contacted", "No Response", "Follow-Up Later", "Interested", "Reloaded", "Reactivated", "Training Required", "Not Interested"];
+
+/* ============================================================================
+   PARSING HELPERS
+============================================================================ */
+function cell(row, idx) { const v = row[idx]; return v === undefined || v === null ? "" : String(v).trim(); }
+function parseNumberVal(raw) {
+  const s = String(raw ?? "").trim();
+  if (s === "") return null;
+  const cleaned = s.replace(/[, ]/g, "").replace(/RM/gi, "");
+  if (cleaned === "" || /^n\/?a$/i.test(cleaned)) return null;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+function excelSerialToDate(n) { return new Date(Math.round((n - 25569) * 86400 * 1000)); }
+function parseDateVal(raw) {
+  const s = String(raw ?? "").trim();
+  if (s === "" || /^n\/?a$/i.test(s)) return { date: null, empty: true, invalid: false };
+  if (/^\d+(\.\d+)?$/.test(s) && Number(s) > 20000 && Number(s) < 60000) {
+    const d = excelSerialToDate(Number(s));
+    if (!isNaN(d.getTime())) return { date: d, empty: false, invalid: false };
+  }
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return { date: d, empty: false, invalid: false };
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (m) {
+    let [, dd, mm, yy] = m;
+    yy = yy.length === 2 ? "20" + yy : yy;
+    d = new Date(`${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`);
+    if (!isNaN(d.getTime())) return { date: d, empty: false, invalid: false };
+  }
+  return { date: null, empty: false, invalid: true };
+}
+function percentileRank(sortedAsc, value) {
+  if (!sortedAsc.length) return 0;
+  let count = 0;
+  for (const v of sortedAsc) if (v <= value) count++;
+  return (count / sortedAsc.length) * 100;
+}
+
+/* ============================================================================
+   CORE DATA PROCESSING
+============================================================================ */
+function extractRawRecords(rows) {
+  const records = [];
+  for (let i = DATA_START_ROW_INDEX; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const email = cell(row, COL.EMAIL), status = cell(row, COL.STATUS), agentName = cell(row, COL.AGENT),
+      phoneNumber = cell(row, COL.PHONE), schoolName = cell(row, COL.SCHOOL), salesRaw = cell(row, COL.SALES),
+      group = cell(row, COL.GROUP), creditRaw = cell(row, COL.CREDIT), reloadDateRaw = cell(row, COL.RELOAD_DATE),
+      reloadAmtRaw = cell(row, COL.RELOAD_AMT);
+    const stateOfficer = cell(row, COL.STATE_OFFICER);
+    const isBlankRow = ![email, status, agentName, phoneNumber, schoolName, salesRaw, group, creditRaw, reloadDateRaw, reloadAmtRaw].some((v) => v !== "");
+    if (isBlankRow) continue;
+    const totalSales = parseNumberVal(salesRaw), creditBalance = parseNumberVal(creditRaw), lastReloadAmount = parseNumberVal(reloadAmtRaw);
+    const dateInfo = parseDateVal(reloadDateRaw);
+    records.push({
+      rowIndex: i + 1, key: `${email || ""}|${phoneNumber || ""}|${agentName || ""}|${i}`,
+      schoolName, agentName, phoneNumber, status, email, group, stateOfficer,
+      totalSales, creditBalance, lastReloadAmount,
+      lastReloadDate: dateInfo.date, reloadDateEmpty: dateInfo.empty, reloadDateInvalid: dateInfo.invalid,
+      _raw: { salesRaw, creditRaw, reloadAmtRaw, reloadDateRaw },
+    });
+  }
+  return records;
+}
+function computeDataQuality(records) {
+  const emailCount = {}, phoneCount = {};
+  records.forEach((r) => {
+    if (r.email) emailCount[r.email.toLowerCase()] = (emailCount[r.email.toLowerCase()] || 0) + 1;
+    if (r.phoneNumber) phoneCount[r.phoneNumber] = (phoneCount[r.phoneNumber] || 0) + 1;
+  });
+  let missingSchool = 0, missingAgent = 0, missingPhone = 0, missingEmail = 0, missingStatus = 0, missingGroup = 0,
+    invalidSales = 0, invalidDate = 0, invalidAmount = 0, invalidCredit = 0, noSales = 0, zeroCredit = 0,
+    dupEmail = 0, dupPhone = 0, incomplete = 0, missingStateOfficer = 0;
+  records.forEach((r) => {
+    let bad = false;
+    if (!r.schoolName) { missingSchool++; bad = true; }
+    if (!r.agentName) { missingAgent++; bad = true; }
+    if (!r.phoneNumber) { missingPhone++; bad = true; }
+    if (!r.email) { missingEmail++; bad = true; }
+    if (!r.status) { missingStatus++; bad = true; }
+    if (!r.group) { missingGroup++; bad = true; }
+    if (!r.stateOfficer) { missingStateOfficer++; }
+    if (r._raw.salesRaw !== "" && r.totalSales === null) { invalidSales++; bad = true; }
+    if (r._raw.creditRaw !== "" && r.creditBalance === null) { invalidCredit++; bad = true; }
+    if (r._raw.reloadAmtRaw !== "" && r.lastReloadAmount === null) { invalidAmount++; bad = true; }
+    if (r.reloadDateInvalid) { invalidDate++; bad = true; }
+    if (r.totalSales === 0) noSales++;
+    if (r.creditBalance === 0) zeroCredit++;
+    if (r.email && emailCount[r.email.toLowerCase()] > 1) dupEmail++;
+    if (r.phoneNumber && phoneCount[r.phoneNumber] > 1) dupPhone++;
+    if (bad) incomplete++;
+  });
+  return {
+    totalRecords: records.length, validRecords: records.length - incomplete, incompleteRecords: incomplete,
+    duplicateEmailRecords: dupEmail, duplicatePhoneRecords: dupPhone,
+    missingReloadDate: records.filter((r) => r.reloadDateEmpty).length, invalidReloadDate: invalidDate,
+    noSales, zeroCredit, missingSchool, missingAgent, missingPhone, missingEmail, missingStatus, missingGroup,
+    invalidSales, invalidAmount, invalidCredit, missingStateOfficer,
+  };
+}
+function computeAgents(records, settings) {
+  const today = new Date();
+  const positiveSales = records.filter((r) => r.totalSales !== null && r.totalSales > 0).map((r) => r.totalSales).sort((a, b) => a - b);
+  const validCredits = records.filter((r) => r.creditBalance !== null).map((r) => r.creditBalance).sort((a, b) => a - b);
+  const validReloadAmts = records.filter((r) => r.lastReloadAmount !== null).map((r) => r.lastReloadAmount).sort((a, b) => a - b);
+  const validDays = records.filter((r) => r.lastReloadDate).map((r) => Math.floor((today - r.lastReloadDate) / 86400000)).sort((a, b) => a - b);
+  const { activeDays, lowDays, atRiskDays, weights } = settings;
+  const wSum = weights.sales + weights.recency + weights.credit + weights.status + weights.reloadAmt + weights.risk || 1;
+
+  return records.map((r) => {
+    const daysSinceLastReload = r.lastReloadDate ? Math.floor((today - r.lastReloadDate) / 86400000) : null;
+    let salesLevel = "UNKNOWN";
+    if (r.totalSales === 0) salesLevel = "ZERO";
+    else if (r.totalSales !== null) {
+      const p = percentileRank(positiveSales, r.totalSales);
+      salesLevel = p >= 90 ? "TOP_PERFORMER" : p >= 70 ? "HIGH_VALUE" : p >= 30 ? "MEDIUM_VALUE" : "LOW_VALUE";
+    }
+    let creditLevel = "UNKNOWN", creditPercentile = null;
+    if (r.creditBalance !== null) {
+      creditPercentile = percentileRank(validCredits, r.creditBalance);
+      creditLevel = creditPercentile <= 25 ? "LOW" : creditPercentile <= 50 ? "MEDIUM" : creditPercentile <= 75 ? "HEALTHY" : "HIGH";
+    }
+    let reloadRecencyStatus, activityStatus;
+    if (r.reloadDateInvalid) { reloadRecencyStatus = "DATA_REVIEW"; activityStatus = "DATA_REVIEW"; }
+    else if (r.reloadDateEmpty || daysSinceLastReload === null) { reloadRecencyStatus = "NO_VALID_RELOAD_DATE"; activityStatus = "NO_RELOAD_RECORD"; }
+    else if (daysSinceLastReload <= activeDays) { reloadRecencyStatus = "RECENT"; activityStatus = "ACTIVE"; }
+    else if (daysSinceLastReload <= lowDays) { reloadRecencyStatus = "MODERATE"; activityStatus = "LOW_ACTIVITY"; }
+    else if (daysSinceLastReload <= atRiskDays) { reloadRecencyStatus = "AGING"; activityStatus = "AT_RISK"; }
+    else { reloadRecencyStatus = "STALE"; activityStatus = "INACTIVE"; }
+
+    const isApproved = /approved/i.test(r.status || "");
+    const salesScore = r.totalSales && r.totalSales > 0 ? percentileRank(positiveSales, r.totalSales) : 0;
+    let recencyScore = 0;
+    if (daysSinceLastReload !== null) recencyScore = percentileRank(validDays, daysSinceLastReload);
+    else if (r.totalSales && r.totalSales > 0) recencyScore = 65;
+    const creditOppScore = creditPercentile !== null ? Math.max(0, 100 - creditPercentile) : 0;
+    const statusScore = isApproved ? 100 : 40;
+    const reloadAmtScore = r.lastReloadAmount !== null ? percentileRank(validReloadAmts, r.lastReloadAmount) : 0;
+    let riskScore = 0;
+    if (r.totalSales === 0) riskScore = r.reloadDateEmpty ? 80 : (r.creditBalance > 0 ? 60 : 40);
+    else if (activityStatus === "INACTIVE") riskScore = 70;
+    else if (activityStatus === "AT_RISK") riskScore = 45;
+
+    const priorityScore = Math.round((salesScore * weights.sales + recencyScore * weights.recency + creditOppScore * weights.credit + statusScore * weights.status + reloadAmtScore * weights.reloadAmt + riskScore * weights.risk) / wSum);
+    const priorityLevel = priorityScore >= 80 ? "CRITICAL" : priorityScore >= 60 ? "HIGH" : priorityScore >= 40 ? "MEDIUM" : "LOW";
+
+    const highSales = salesLevel === "TOP_PERFORMER" || salesLevel === "HIGH_VALUE";
+    let category = null; const reasons = [];
+    if (isApproved && highSales && creditLevel === "LOW" && daysSinceLastReload !== null && daysSinceLastReload > lowDays) {
+      category = "URGENT_RELOAD"; reasons.push("Agent approved", "Total sales dalam kategori tinggi", "Baki kredit rendah", `${daysSinceLastReload} hari sejak reload terakhir`);
+    } else if (highSales && (activityStatus === "AT_RISK" || activityStatus === "INACTIVE")) {
+      category = "HIGH_VALUE_AT_RISK"; reasons.push("Total sales tinggi", `Status aktiviti: ${ACTIVITY_META[activityStatus].label}`, daysSinceLastReload !== null ? `${daysSinceLastReload} hari sejak reload terakhir` : "Tiada rekod reload sah");
+    } else if (creditLevel === "LOW" && r.totalSales > 0) {
+      category = "LOW_CREDIT_FOLLOWUP"; reasons.push("Baki kredit rendah", "Agent masih mempunyai jualan");
+    } else if (activityStatus === "INACTIVE") {
+      category = "INACTIVE"; reasons.push(`Tiada reload untuk ${daysSinceLastReload} hari`);
+    } else if (activityStatus === "LOW_ACTIVITY" || activityStatus === "AT_RISK") {
+      category = "LOW_ACTIVITY"; reasons.push("Sales rendah / reload tidak konsisten", daysSinceLastReload !== null ? `${daysSinceLastReload} hari sejak reload terakhir` : "");
+    } else if (salesLevel === "ZERO") {
+      category = "ZERO_SALES";
+      if (r.reloadDateEmpty) reasons.push("Tiada rekod reload", "Total sales = 0");
+      else if (r.creditBalance > 0) reasons.push("Mempunyai baki kredit tetapi tiada jualan");
+      else reasons.push("Total sales = 0");
+    } else if (isApproved && activityStatus === "ACTIVE" && (salesLevel === "HIGH_VALUE" || salesLevel === "MEDIUM_VALUE") && (creditLevel === "HEALTHY" || creditLevel === "HIGH")) {
+      category = "HIGH_POTENTIAL"; reasons.push("Agent approved & aktif", "Sales baik", "Baki kredit sihat untuk peningkatan reload");
+    }
+
+    let action = "NONE";
+    if (category === "URGENT_RELOAD") action = "RELOAD";
+    else if (category === "HIGH_VALUE_AT_RISK") action = "CALL";
+    else if (category === "LOW_CREDIT_FOLLOWUP") action = "WHATSAPP";
+    else if (category === "INACTIVE") action = "REACTIVATE";
+    else if (category === "LOW_ACTIVITY") action = "WHATSAPP";
+    else if (category === "ZERO_SALES") action = r.reloadDateEmpty ? "TRAINING" : "INVESTIGATE";
+    else if (category === "HIGH_POTENTIAL") action = "UPSELL";
+    else if (!r.schoolName || !r.agentName || !r.phoneNumber) action = "UPDATE_INFO";
+
+    return { ...r, daysSinceLastReload, reloadRecencyStatus, activityStatus, salesLevel, creditLevel, creditPercentile, isApproved, priorityScore, priorityLevel, recommendedAction: action, actionReason: reasons.filter(Boolean).join(" • "), category };
+  });
+}
+function computeGroupStats(agents) {
+  const groups = {};
+  agents.forEach((a) => {
+    const g = a.group || "(No Group)";
+    if (!groups[g]) groups[g] = { name: g, total: 0, approved: 0, totalSales: 0, salesCount: 0, totalCredit: 0, creditCount: 0, active: 0, atRisk: 0, inactive: 0, zeroSales: 0, highPriority: 0 };
+    const gr = groups[g];
+    gr.total++;
+    if (a.isApproved) gr.approved++;
+    if (a.totalSales !== null) { gr.totalSales += a.totalSales; gr.salesCount++; }
+    if (a.creditBalance !== null) { gr.totalCredit += a.creditBalance; gr.creditCount++; }
+    if (a.activityStatus === "ACTIVE") gr.active++;
+    if (a.activityStatus === "AT_RISK") gr.atRisk++;
+    if (a.activityStatus === "INACTIVE") gr.inactive++;
+    if (a.salesLevel === "ZERO") gr.zeroSales++;
+    if (a.priorityLevel === "CRITICAL" || a.priorityLevel === "HIGH") gr.highPriority++;
+  });
+  return Object.values(groups).map((g) => ({ ...g, avgSales: g.salesCount ? g.totalSales / g.salesCount : 0, avgCredit: g.creditCount ? g.totalCredit / g.creditCount : 0 })).sort((a, b) => b.totalSales - a.totalSales);
+}
+
+/* ============================================================================
+   EXPORT — Updated Excel (download) + Google Drive upload
+============================================================================ */
+function buildExportSheetRows(agents, followUps, officerEnabled) {
+  const header = [
+    "School Name", "Agent Name", "Phone Number", "Email", "Status", "Group",
+    ...(officerEnabled ? ["State Officer"] : []),
+    "Total Sales 24-26", "Credit Balance", "Last Reload Date", "Last Reload Amount",
+    "Days Since Last Reload", "Activity Status", "Sales Level", "Credit Level",
+    "Priority Score", "Priority Level", "Recommended Action", "Action Reason",
+    "Follow-Up Status", "Follow-Up Notes", "Follow-Up Date", "Next Action Date",
+  ];
+  const rows = agents.map((a) => {
+    const fu = followUps[a.key] || {};
+    return [
+      a.schoolName, a.agentName, a.phoneNumber, a.email, a.status, a.group,
+      ...(officerEnabled ? [a.stateOfficer || ""] : []),
+      a.totalSales ?? "", a.creditBalance ?? "",
+      a.lastReloadDate ? a.lastReloadDate.toLocaleDateString("en-MY") : (a.reloadDateInvalid ? "INVALID" : ""),
+      a.lastReloadAmount ?? "", a.daysSinceLastReload ?? "",
+      ACTIVITY_META[a.activityStatus].label, SALES_META[a.salesLevel].label, CREDIT_META[a.creditLevel].label,
+      a.priorityScore, PRIORITY_META[a.priorityLevel].label, ACTION_META[a.recommendedAction].label, a.actionReason,
+      fu.status || "", fu.notes || "", fu.followUpDate || "", fu.nextActionDate || "",
+    ];
+  });
+  return [header, ...rows];
+}
+function exportWorkbook(agents, followUps, officerEnabled) {
+  const aoa = buildExportSheetRows(agents, followUps, officerEnabled);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "TOPUP APPS AGENT - UPDATED");
+  return wb;
+}
+function downloadExcel(agents, followUps, officerEnabled) {
+  const wb = exportWorkbook(agents, followUps, officerEnabled);
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `topup-agent-updated-${stamp}.xlsx`);
+}
+function workbookToBlob(wb) {
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  return new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+async function uploadToGoogleDrive(agents, followUps, officerEnabled, accessToken) {
+  const wb = exportWorkbook(agents, followUps, officerEnabled);
+  const blob = workbookToBlob(wb);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const fileName = `topup-agent-updated-${stamp}.xlsx`;
+  const metadata = { name: fileName, mimeType: blob.type };
+  const form = new FormData();
+  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+  form.append("file", blob);
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Google Drive upload gagal (${res.status})`);
+  return res.json();
+}
+
+/* ============================================================================
+   UI PRIMITIVES
+============================================================================ */
+const COLOR_CLASSES = {
+  red: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", solid: "bg-red-500" },
+  orange: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", solid: "bg-orange-500" },
+  amber: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", solid: "bg-amber-400" },
+  emerald: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", solid: "bg-emerald-500" },
+  slate: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200", solid: "bg-slate-400" },
+  violet: { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200", solid: "bg-violet-500" },
+  rose: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200", solid: "bg-rose-500" },
+  blue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", solid: "bg-blue-600" },
+  yellow: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", solid: "bg-yellow-400" },
+};
+function Badge({ color = "slate", children }) {
+  const c = COLOR_CLASSES[color] || COLOR_CLASSES.slate;
+  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${c.bg} ${c.text} ${c.border}`}>{children}</span>;
+}
+function KpiCard({ label, value, sub, color = "slate", icon }) {
+  const c = COLOR_CLASSES[color] || COLOR_CLASSES.slate;
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4 flex items-start justify-between">
+      <div>
+        <div className="text-xs font-medium text-slate-500">{label}</div>
+        <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">{value}</div>
+        {sub && <div className="text-xs text-slate-400 mt-1">{sub}</div>}
+      </div>
+      {icon && <div className={`w-9 h-9 rounded-md ${c.bg} flex items-center justify-center shrink-0`}><Icon name={icon} size={18} className={c.text} /></div>}
+    </div>
+  );
+}
+function fmtMoney(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return "RM " + n.toLocaleString("en-MY", { maximumFractionDigits: 0 }); }
+function fmtNum(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return n.toLocaleString("en-MY"); }
+function waLink(phone) { const digits = (phone || "").replace(/[^0-9]/g, ""); const normalized = digits.startsWith("0") ? "6" + digits : digits; return `https://wa.me/${normalized}`; }
+
+function SimpleBarChartH({ data }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="space-y-2.5">
+      {data.map((d) => (
+        <div key={d.name} className="flex items-center gap-2">
+          <div className="w-20 text-xs text-slate-500 shrink-0">{d.name}</div>
+          <div className="flex-1 h-5 bg-slate-100 rounded overflow-hidden">
+            <div className="h-full rounded" style={{ width: `${(d.value / max) * 100}%`, backgroundColor: d.color }} />
+          </div>
+          <div className="w-8 text-xs text-slate-600 text-right tabular-nums">{d.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+function SimpleBarChartV({ data }) {
+  const max = Math.max(...data.map((d) => d.sales), 1);
+  return (
+    <div className="flex items-end gap-2 h-48">
+      {data.map((d) => (
+        <div key={d.name} className="flex-1 flex flex-col items-center justify-end h-full min-w-0">
+          <div className="text-[10px] text-slate-500 mb-1 truncate w-full text-center">{fmtMoney(d.sales)}</div>
+          <div className="w-full bg-slate-900 rounded-t" style={{ height: `${(d.sales / max) * 100}%`, minHeight: "2px" }} />
+          <div className="text-[10px] text-slate-500 mt-1 truncate w-full text-center">{d.name}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================================================
+   AGENT CARD / MODAL
+============================================================================ */
+function AgentActionCard({ agent, onOpen }) {
+  const pMeta = PRIORITY_META[agent.priorityLevel];
+  const actMeta = ACTION_META[agent.recommendedAction];
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-3.5 hover:border-slate-300 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <button onClick={() => onOpen(agent)} className="text-left flex-1 min-w-0">
+          <div className="font-medium text-slate-900 truncate">{agent.agentName || "(No Name)"}</div>
+          <div className="text-xs text-slate-500 truncate mt-0.5">{agent.schoolName || "(No School)"}</div>
+        </button>
+        <Badge color={pMeta.color}>{pMeta.label} · {agent.priorityScore}</Badge>
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        <Badge color={SALES_META[agent.salesLevel].color}>{SALES_META[agent.salesLevel].label}</Badge>
+        <Badge color={CREDIT_META[agent.creditLevel].color}>{CREDIT_META[agent.creditLevel].label}</Badge>
+        <Badge color={ACTIVITY_META[agent.activityStatus].color}>{ACTIVITY_META[agent.activityStatus].label}</Badge>
+      </div>
+      {agent.actionReason && <div className="text-xs text-slate-500 mt-2.5 leading-relaxed">{agent.actionReason}</div>}
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+        <a href={`tel:${agent.phoneNumber}`} className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={13} /> Call</a>
+        <a href={waLink(agent.phoneNumber)} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"><Icon name="message" size={13} /> WhatsApp</a>
+        <div className="ml-auto flex items-center gap-1 text-xs text-slate-500"><Icon name={actMeta.icon} size={13} /> {actMeta.label}</div>
+      </div>
+    </div>
+  );
+}
+function Info({ label, value }) { return <div><div className="text-xs text-slate-400">{label}</div><div className="text-slate-800 mt-0.5">{value}</div></div>; }
+function AgentProfileModal({ agent, onClose, followUp, onUpdateFollowUp }) {
+  if (!agent) return null;
+  const pMeta = PRIORITY_META[agent.priorityLevel];
+  const fu = followUp || { status: "Pending", notes: "", followUpDate: "", nextActionDate: "" };
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-start justify-between">
+          <div><div className="text-lg font-semibold text-slate-900">{agent.agentName || "(No Name)"}</div><div className="text-sm text-slate-500">{agent.schoolName || "(No School)"}</div></div>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"><Icon name="x" size={18} /></button>
+        </div>
+        <div className="p-5 space-y-5">
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-2">BASIC INFORMATION</div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Info label="Phone" value={agent.phoneNumber || "—"} />
+              <Info label="Email" value={agent.email || "—"} />
+              <Info label="Status" value={agent.status || "—"} />
+              <Info label="Group" value={agent.group || "—"} />
+              {agent.stateOfficer !== undefined && agent.stateOfficer !== "" && <Info label="State Officer" value={agent.stateOfficer} />}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-2">SALES & RELOAD</div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Info label="Total Sales (24-26)" value={fmtMoney(agent.totalSales)} />
+              <Info label="Sales Level" value={<Badge color={SALES_META[agent.salesLevel].color}>{SALES_META[agent.salesLevel].label}</Badge>} />
+              <Info label="Credit Balance" value={fmtMoney(agent.creditBalance)} />
+              <Info label="Credit Level" value={<Badge color={CREDIT_META[agent.creditLevel].color}>{CREDIT_META[agent.creditLevel].label}</Badge>} />
+              <Info label="Last Reload Date" value={agent.lastReloadDate ? agent.lastReloadDate.toLocaleDateString("en-MY") : "No valid date"} />
+              <Info label="Days Since Reload" value={agent.daysSinceLastReload !== null ? `${agent.daysSinceLastReload} hari` : "—"} />
+              <Info label="Amount Last Reload" value={fmtMoney(agent.lastReloadAmount)} />
+              <Info label="Activity Status" value={<Badge color={ACTIVITY_META[agent.activityStatus].color}>{ACTIVITY_META[agent.activityStatus].label}</Badge>} />
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-2">ANALYSIS</div>
+            <div className="rounded-lg border border-slate-200 p-3.5 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Priority Score</span>
+                <Badge color={pMeta.color}>{pMeta.label} · {agent.priorityScore}/100</Badge>
+              </div>
+              <div className="w-full h-1.5 bg-slate-200 rounded-full mt-2 overflow-hidden"><div className={`h-full ${COLOR_CLASSES[pMeta.color].solid}`} style={{ width: `${agent.priorityScore}%` }} /></div>
+              {agent.category && <div className="mt-3 text-sm"><span className="font-medium text-slate-700">{CATEGORY_META[agent.category].icon} {CATEGORY_META[agent.category].label}</span><span className="mx-1.5 text-slate-300">·</span><span className="text-slate-600">{ACTION_META[agent.recommendedAction].label}</span></div>}
+              {agent.actionReason && <div className="mt-2 text-xs text-slate-500 leading-relaxed"><span className="font-medium text-slate-600">Why? </span>{agent.actionReason}</div>}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-2">FOLLOW-UP MANAGEMENT</div>
+            <div className="space-y-2.5">
+              <select value={fu.status} onChange={(e) => onUpdateFollowUp(agent.key, { ...fu, status: e.target.value })} className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm">
+                {FOLLOWUP_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <textarea placeholder="Notes / action taken..." value={fu.notes} onChange={(e) => onUpdateFollowUp(agent.key, { ...fu, notes: e.target.value })} className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-20 resize-none" />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div><label className="text-xs text-slate-500">Follow-Up Date</label><input type="date" value={fu.followUpDate} onChange={(e) => onUpdateFollowUp(agent.key, { ...fu, followUpDate: e.target.value })} className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm mt-1" /></div>
+                <div><label className="text-xs text-slate-500">Next Action Date</label><input type="date" value={fu.nextActionDate} onChange={(e) => onUpdateFollowUp(agent.key, { ...fu, nextActionDate: e.target.value })} className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm mt-1" /></div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <a href={`tel:${agent.phoneNumber}`} className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={15} /> Call</a>
+            <a href={waLink(agent.phoneNumber)} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"><Icon name="message" size={15} /> WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   FILTER BAR
+============================================================================ */
+function FilterBar({ agents, filters, setFilters, search, setSearch }) {
+  const groups = useMemo(() => [...new Set(agents.map((a) => a.group).filter(Boolean))].sort(), [agents]);
+  const statuses = useMemo(() => [...new Set(agents.map((a) => a.status).filter(Boolean))].sort(), [agents]);
+  const officers = useMemo(() => [...new Set(agents.map((a) => a.stateOfficer).filter(Boolean))].sort(), [agents]);
+  const Select = ({ field, label, options }) => (
+    <select value={filters[field] || ""} onChange={(e) => setFilters((f) => ({ ...f, [field]: e.target.value }))} className="border border-slate-300 rounded-md px-2.5 py-1.5 text-sm bg-white text-slate-700">
+      <option value="">{label}</option>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  );
+  return (
+    <div className="flex flex-wrap gap-2 items-center mb-4">
+      <div className="relative flex-1 min-w-[180px]">
+        <span className="absolute left-2.5 top-2.5 text-slate-400"><Icon name="search" size={15} /></span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search school, agent, phone, email..." className="w-full border border-slate-300 rounded-md pl-8 pr-3 py-1.5 text-sm" />
+      </div>
+      <Select field="group" label="All Groups" options={groups.map((g) => ({ value: g, label: g }))} />
+      <Select field="status" label="All Status" options={statuses.map((s) => ({ value: s, label: s }))} />
+      <Select field="activityStatus" label="All Activity" options={Object.entries(ACTIVITY_META).map(([k, v]) => ({ value: k, label: v.label }))} />
+      <Select field="salesLevel" label="All Sales Level" options={Object.entries(SALES_META).map(([k, v]) => ({ value: k, label: v.label }))} />
+      <Select field="priorityLevel" label="All Priority" options={Object.entries(PRIORITY_META).map(([k, v]) => ({ value: k, label: v.label }))} />
+      <Select field="creditLevel" label="All Credit Level" options={Object.entries(CREDIT_META).map(([k, v]) => ({ value: k, label: v.label }))} />
+      {officers.length > 0 && <Select field="stateOfficer" label="All State Officers" options={officers.map((o) => ({ value: o, label: o }))} />}
+      {(filters.group || filters.status || filters.activityStatus || filters.salesLevel || filters.priorityLevel || filters.creditLevel || filters.stateOfficer || search) && (
+        <button onClick={() => { setFilters({}); setSearch(""); }} className="text-xs text-slate-500 underline px-1">Clear</button>
+      )}
+    </div>
+  );
+}
+function applyFilters(agents, filters, search) {
+  return agents.filter((a) => {
+    if (filters.group && a.group !== filters.group) return false;
+    if (filters.status && a.status !== filters.status) return false;
+    if (filters.activityStatus && a.activityStatus !== filters.activityStatus) return false;
+    if (filters.salesLevel && a.salesLevel !== filters.salesLevel) return false;
+    if (filters.priorityLevel && a.priorityLevel !== filters.priorityLevel) return false;
+    if (filters.creditLevel && a.creditLevel !== filters.creditLevel) return false;
+    if (filters.stateOfficer && a.stateOfficer !== filters.stateOfficer) return false;
+    if (search) { const q = search.toLowerCase(); const hay = `${a.schoolName} ${a.agentName} ${a.phoneNumber} ${a.email} ${a.stateOfficer}`.toLowerCase(); if (!hay.includes(q)) return false; }
+    return true;
+  });
+}
+
+/* ============================================================================
+   PAGES
+============================================================================ */
+function ImportPage({ onFile, error, fileName }) {
+  const inputRef = useRef(null);
+  const [dragOver, setDragOver] = useState(false);
+  return (
+    <div className="max-w-xl mx-auto mt-6 sm:mt-16 px-4">
+      <div className="text-center mb-6">
+        <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center mx-auto mb-4"><Icon name="target" size={22} className="text-white" /></div>
+        <h1 className="text-xl font-semibold text-slate-900">TOPUP APPS AGENT — Sales Action Center</h1>
+        <p className="text-sm text-slate-500 mt-1.5">Upload fail Excel untuk mula analisis. Sistem hanya membaca worksheet <span className="font-medium text-slate-700">"{SHEET_NAME}"</span>, bermula Row 11.</p>
+      </div>
+      <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]); }} onClick={() => inputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${dragOver ? "border-slate-900 bg-slate-50" : "border-slate-300 hover:border-slate-400"}`}>
+        <div className="mx-auto text-slate-400 mb-3 flex justify-center"><Icon name="upload" size={26} /></div>
+        <div className="text-sm font-medium text-slate-700">Klik atau drag fail Excel di sini</div>
+        <div className="text-xs text-slate-400 mt-1">.xlsx atau .xls</div>
+        <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+      </div>
+      {fileName && !error && <div className="text-xs text-slate-500 mt-3 text-center">Loaded: {fileName}</div>}
+      {error && <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3.5 flex gap-2"><Icon name="alertTriangle" size={16} className="shrink-0 mt-0.5" /> <span>{error}</span></div>}
+      <div className="mt-6 text-xs text-slate-400 leading-relaxed">Column digunakan: B (Email), E (Status), G (Agent Name), H (Phone), M (School Name), O (Total Sales 24-26), Q (Group), R (Credit Balance), S (Date Last Reload), T (Amount Last Reload).</div>
+    </div>
+  );
+}
+function DashboardPage({ agents, groupStats, onOpenAgent, dataQuality }) {
+  const totalAgents = agents.length;
+  const approved = agents.filter((a) => a.isApproved).length;
+  const totalSales = agents.reduce((s, a) => s + (a.totalSales || 0), 0);
+  const salesCount = agents.filter((a) => a.totalSales !== null).length;
+  const totalCredit = agents.reduce((s, a) => s + (a.creditBalance || 0), 0);
+  const creditCount = agents.filter((a) => a.creditBalance !== null).length;
+  const active = agents.filter((a) => a.activityStatus === "ACTIVE").length;
+  const lowAct = agents.filter((a) => a.activityStatus === "LOW_ACTIVITY").length;
+  const atRisk = agents.filter((a) => a.activityStatus === "AT_RISK").length;
+  const inactive = agents.filter((a) => a.activityStatus === "INACTIVE").length;
+  const noRecord = agents.filter((a) => a.activityStatus === "NO_RELOAD_RECORD" || a.activityStatus === "DATA_REVIEW").length;
+  const urgentCount = agents.filter((a) => a.category === "URGENT_RELOAD").length;
+  const highPriorityCount = agents.filter((a) => a.priorityLevel === "CRITICAL" || a.priorityLevel === "HIGH").length;
+  const followUpCount = agents.filter((a) => a.category).length;
+  const reactivationCount = agents.filter((a) => a.category === "INACTIVE" || (a.category === "ZERO_SALES" && a.reloadDateEmpty)).length;
+  const topSales = [...agents].filter((a) => a.totalSales !== null).sort((a, b) => b.totalSales - a.totalSales).slice(0, 10);
+  const activityChartData = [
+    { name: "Active", value: active, color: "#10b981" }, { name: "Low Act.", value: lowAct, color: "#fbbf24" },
+    { name: "At Risk", value: atRisk, color: "#f97316" }, { name: "Inactive", value: inactive, color: "#ef4444" },
+    { name: "No Record", value: noRecord, color: "#94a3b8" },
+  ];
+  const salesByGroupData = groupStats.slice(0, 10).map((g) => ({ name: g.name, sales: Math.round(g.totalSales) }));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="text-xs font-medium text-slate-500 mb-2.5">OVERVIEW</div>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <KpiCard label="Total Agents" value={fmtNum(totalAgents)} icon="users" color="slate" />
+          <KpiCard label="Approved Agents" value={fmtNum(approved)} sub={`${totalAgents ? Math.round((approved / totalAgents) * 100) : 0}% of total`} icon="check" color="emerald" />
+          <KpiCard label="Total Sales 24-26" value={fmtMoney(totalSales)} sub={`${salesCount} agents with data`} icon="trendingUp" color="violet" />
+          <KpiCard label="Avg Sales / Agent" value={fmtMoney(salesCount ? totalSales / salesCount : 0)} icon="chart" color="blue" />
+          <KpiCard label="Total Credit Balance" value={fmtMoney(totalCredit)} icon="creditCard" color="orange" />
+          <KpiCard label="Avg Credit Balance" value={fmtMoney(creditCount ? totalCredit / creditCount : 0)} icon="creditCard" color="amber" />
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-medium text-slate-500 mb-2.5">SALES ACTION SUMMARY</div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard label="Urgent Reload" value={fmtNum(urgentCount)} icon="shield" color="red" />
+          <KpiCard label="High Priority Agents" value={fmtNum(highPriorityCount)} icon="award" color="orange" />
+          <KpiCard label="Follow-Up Required" value={fmtNum(followUpCount)} icon="clipboard" color="amber" />
+          <KpiCard label="Reactivation Required" value={fmtNum(reactivationCount)} icon="refresh" color="slate" />
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="text-sm font-medium text-slate-700 mb-3">Activity Status Breakdown</div>
+          <SimpleBarChartH data={activityChartData} />
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="text-sm font-medium text-slate-700 mb-3">Total Sales by Group</div>
+          <SimpleBarChartV data={salesByGroupData} />
+        </div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div className="text-sm font-medium text-slate-700 px-4 pt-4 pb-2">Top 10 Sales Agents</div>
+        <table className="w-full text-sm">
+          <thead><tr className="text-xs text-slate-400 border-t border-slate-100"><th className="text-left font-medium px-4 py-2">Agent</th><th className="text-left font-medium px-4 py-2 hidden sm:table-cell">School</th><th className="text-left font-medium px-4 py-2">Group</th><th className="text-right font-medium px-4 py-2">Sales</th><th className="text-right font-medium px-4 py-2">Priority</th></tr></thead>
+          <tbody>{topSales.map((a) => (
+            <tr key={a.key} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => onOpenAgent(a)}>
+              <td className="px-4 py-2.5 font-medium text-slate-800">{a.agentName || "—"}</td>
+              <td className="px-4 py-2.5 text-slate-500 hidden sm:table-cell truncate max-w-[200px]">{a.schoolName || "—"}</td>
+              <td className="px-4 py-2.5 text-slate-500">{a.group || "—"}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-800">{fmtMoney(a.totalSales)}</td>
+              <td className="px-4 py-2.5 text-right"><Badge color={PRIORITY_META[a.priorityLevel].color}>{a.priorityScore}</Badge></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {dataQuality.incompleteRecords > 0 && <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 items-start"><Icon name="alertTriangle" size={14} className="shrink-0 mt-0.5" /><span>{dataQuality.incompleteRecords} rekod mempunyai data yang tidak lengkap atau tidak sah. Lihat halaman Data Quality untuk butiran.</span></div>}
+    </div>
+  );
+}
+function ActionCenterPage({ agents, onOpenAgent }) {
+  const grouped = useMemo(() => {
+    const g = {}; CATEGORY_ORDER.forEach((c) => (g[c] = []));
+    agents.forEach((a) => { if (a.category && g[a.category]) g[a.category].push(a); });
+    Object.values(g).forEach((arr) => arr.sort((a, b) => b.priorityScore - a.priorityScore));
+    return g;
+  }, [agents]);
+  const totalActionable = CATEGORY_ORDER.reduce((s, c) => s + grouped[c].length, 0);
+  return (
+    <div className="space-y-7">
+      <div><h1 className="text-lg font-semibold text-slate-900">🎯 Sales Action Center</h1><p className="text-sm text-slate-500 mt-0.5">Siapa yang perlu dihubungi hari ini, dan apa tindakan yang perlu dilakukan — {totalActionable} agent memerlukan tindakan.</p></div>
+      {CATEGORY_ORDER.map((cat) => {
+        const list = grouped[cat]; if (!list.length) return null;
+        const meta = CATEGORY_META[cat];
+        return (
+          <div key={cat}>
+            <div className="flex items-center gap-2 mb-3"><span className="text-base">{meta.icon}</span><h2 className="text-sm font-semibold text-slate-800">{meta.label}</h2><Badge color={meta.color}>{list.length}</Badge></div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{list.slice(0, 30).map((a) => <AgentActionCard key={a.key} agent={a} onOpen={onOpenAgent} />)}</div>
+            {list.length > 30 && <div className="text-xs text-slate-400 mt-2">+ {list.length - 30} lagi agent dalam kategori ini — guna halaman Agents untuk senarai penuh.</div>}
+          </div>
+        );
+      })}
+      {totalActionable === 0 && <div className="text-center text-sm text-slate-400 py-16">Tiada agent memerlukan tindakan segera berdasarkan data semasa.</div>}
+    </div>
+  );
+}
+function AgentsPage({ agents, onOpenAgent, sortKey, setSortKey, sortDir, setSortDir }) {
+  const sorted = useMemo(() => {
+    const arr = [...agents];
+    arr.sort((a, b) => {
+      let av = a[sortKey], bv = b[sortKey];
+      if (av === null || av === undefined) av = -Infinity;
+      if (bv === null || bv === undefined) bv = -Infinity;
+      if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+    return arr;
+  }, [agents, sortKey, sortDir]);
+  const toggleSort = (key) => { if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc")); else { setSortKey(key); setSortDir("desc"); } };
+  const Th = ({ label, k, className = "" }) => <th className={`text-left font-medium px-3 py-2 cursor-pointer select-none whitespace-nowrap ${className}`} onClick={() => toggleSort(k)}><span className="inline-flex items-center gap-1">{label}{sortKey === k && <Icon name="arrowUpDown" size={11} />}</span></th>;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4"><h1 className="text-lg font-semibold text-slate-900">Agents <span className="text-slate-400 font-normal text-sm">({sorted.length})</span></h1></div>
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[980px]">
+          <thead><tr className="text-xs text-slate-400 border-b border-slate-100">
+            <Th label="Agent" k="agentName" /><Th label="School" k="schoolName" /><Th label="Group" k="group" /><Th label="Officer" k="stateOfficer" /><Th label="Status" k="status" />
+            <Th label="Sales" k="totalSales" className="text-right" /><Th label="Credit" k="creditBalance" className="text-right" />
+            <Th label="Days Since Reload" k="daysSinceLastReload" className="text-right" /><Th label="Activity" k="activityStatus" />
+            <Th label="Priority" k="priorityScore" className="text-right" /><th className="text-right font-medium px-3 py-2">Action</th>
+          </tr></thead>
+          <tbody>{sorted.slice(0, 200).map((a) => (
+            <tr key={a.key} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => onOpenAgent(a)}>
+              <td className="px-3 py-2.5 font-medium text-slate-800 whitespace-nowrap">{a.agentName || "—"}</td>
+              <td className="px-3 py-2.5 text-slate-500 max-w-[180px] truncate">{a.schoolName || "—"}</td>
+              <td className="px-3 py-2.5 text-slate-500">{a.group || "—"}</td>
+              <td className="px-3 py-2.5 text-slate-500">{a.stateOfficer || "—"}</td>
+              <td className="px-3 py-2.5 text-slate-500">{a.status || "—"}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(a.totalSales)}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(a.creditBalance)}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{a.daysSinceLastReload ?? "—"}</td>
+              <td className="px-3 py-2.5"><Badge color={ACTIVITY_META[a.activityStatus].color}>{ACTIVITY_META[a.activityStatus].label}</Badge></td>
+              <td className="px-3 py-2.5 text-right"><Badge color={PRIORITY_META[a.priorityLevel].color}>{a.priorityScore}</Badge></td>
+              <td className="px-3 py-2.5 text-right"><div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <a href={`tel:${a.phoneNumber}`} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200"><Icon name="phone" size={13} /></a>
+                <a href={waLink(a.phoneNumber)} target="_blank" rel="noreferrer" className="p-1.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-700"><Icon name="message" size={13} /></a>
+              </div></td>
+            </tr>
+          ))}</tbody>
+        </table>
+        {sorted.length > 200 && <div className="text-xs text-slate-400 text-center py-3 border-t border-slate-100">Menunjukkan 200 daripada {sorted.length} rekod — gunakan filter/search untuk menyempitkan carian.</div>}
+        {sorted.length === 0 && <div className="text-center text-sm text-slate-400 py-12">Tiada agent sepadan dengan filter semasa.</div>}
+      </div>
+    </div>
+  );
+}
+function ReloadOpportunitiesPage({ agents, onOpenAgent }) {
+  const list = useMemo(() => agents.filter((a) => a.isApproved && (a.salesLevel === "TOP_PERFORMER" || a.salesLevel === "HIGH_VALUE" || a.salesLevel === "MEDIUM_VALUE") && (a.creditLevel === "LOW" || a.creditLevel === "MEDIUM")).sort((a, b) => b.priorityScore - a.priorityScore), [agents]);
+  return (
+    <div>
+      <h1 className="text-lg font-semibold text-slate-900 mb-1">🔥 Reload Opportunities</h1>
+      <p className="text-sm text-slate-500 mb-4">Agent approved dengan jualan baik tetapi baki kredit rendah/sederhana — berpotensi tinggi untuk reload.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{list.map((a) => <AgentActionCard key={a.key} agent={a} onOpen={onOpenAgent} />)}</div>
+      {list.length === 0 && <div className="text-center text-sm text-slate-400 py-16">Tiada peluang reload dikenal pasti buat masa ini.</div>}
+    </div>
+  );
+}
+function ReactivationPage({ agents, onOpenAgent }) {
+  const list = useMemo(() => agents.filter((a) => a.activityStatus === "INACTIVE" || a.activityStatus === "NO_RELOAD_RECORD" || (a.salesLevel === "ZERO" && a.reloadDateEmpty)).sort((a, b) => b.priorityScore - a.priorityScore), [agents]);
+  return (
+    <div>
+      <h1 className="text-lg font-semibold text-slate-900 mb-1">🔄 Reactivation Candidates</h1>
+      <p className="text-sm text-slate-500 mb-4">Agent tidak aktif atau tiada rekod reload — sesuai untuk onboarding semula, training, atau follow-up pengaktifan.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">{list.map((a) => <AgentActionCard key={a.key} agent={a} onOpen={onOpenAgent} />)}</div>
+      {list.length === 0 && <div className="text-center text-sm text-slate-400 py-16">Tiada calon reactivation buat masa ini.</div>}
+    </div>
+  );
+}
+function HighlightCard({ title, name, detail, color }) {
+  const c = COLOR_CLASSES[color];
+  return <div className={`rounded-lg border p-4 ${c.bg} ${c.border}`}><div className={`text-xs font-medium ${c.text}`}>{title}</div><div className="text-base font-semibold text-slate-900 mt-1">{name}</div><div className="text-xs text-slate-500 mt-0.5">{detail}</div></div>;
+}
+function GroupPerformancePage({ groupStats }) {
+  const best = groupStats[0];
+  const needsAttention = [...groupStats].sort((a, b) => (b.inactive + b.zeroSales) - (a.inactive + a.zeroSales))[0];
+  const highestOpportunity = [...groupStats].sort((a, b) => b.highPriority - a.highPriority)[0];
+  return (
+    <div className="space-y-5">
+      <h1 className="text-lg font-semibold text-slate-900">Group Performance</h1>
+      <div className="grid sm:grid-cols-3 gap-3">
+        {best && <HighlightCard title="Best Performing Group" name={best.name} detail={fmtMoney(best.totalSales) + " total sales"} color="emerald" />}
+        {needsAttention && <HighlightCard title="Group Needing Attention" name={needsAttention.name} detail={`${needsAttention.inactive} inactive · ${needsAttention.zeroSales} zero sales`} color="red" />}
+        {highestOpportunity && <HighlightCard title="Highest Reload Opportunity" name={highestOpportunity.name} detail={`${highestOpportunity.highPriority} high priority agents`} color="orange" />}
+      </div>
+      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[760px]">
+          <thead><tr className="text-xs text-slate-400 border-b border-slate-100">
+            <th className="text-left font-medium px-3 py-2">Group</th><th className="text-right font-medium px-3 py-2">Total Agent</th><th className="text-right font-medium px-3 py-2">Approved</th>
+            <th className="text-right font-medium px-3 py-2">Total Sales</th><th className="text-right font-medium px-3 py-2">Avg Sales</th><th className="text-right font-medium px-3 py-2">Avg Credit</th>
+            <th className="text-right font-medium px-3 py-2">Active</th><th className="text-right font-medium px-3 py-2">At Risk</th><th className="text-right font-medium px-3 py-2">Inactive</th>
+            <th className="text-right font-medium px-3 py-2">Zero Sales</th><th className="text-right font-medium px-3 py-2">High Priority</th>
+          </tr></thead>
+          <tbody>{groupStats.map((g) => (
+            <tr key={g.name} className="border-b border-slate-50 hover:bg-slate-50">
+              <td className="px-3 py-2.5 font-medium text-slate-800">{g.name}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{g.total}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{g.approved}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums font-medium">{fmtMoney(g.totalSales)}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(g.avgSales)}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{fmtMoney(g.avgCredit)}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-emerald-600">{g.active}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-orange-600">{g.atRisk}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-red-600">{g.inactive}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{g.zeroSales}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{g.highPriority}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+function DataQualityPage({ dataQuality }) {
+  const dq = dataQuality;
+  const rows = [["Total Records", dq.totalRecords], ["Valid Records", dq.validRecords], ["Incomplete Records", dq.incompleteRecords], ["Duplicate Email Records", dq.duplicateEmailRecords], ["Duplicate Phone Records", dq.duplicatePhoneRecords], ["Missing Reload Date", dq.missingReloadDate], ["Invalid Reload Date", dq.invalidReloadDate], ["No Sales (Zero)", dq.noSales], ["Zero Credit", dq.zeroCredit], ["Missing School Name", dq.missingSchool], ["Missing Agent Name", dq.missingAgent], ["Missing Phone Number", dq.missingPhone], ["Missing Email", dq.missingEmail], ["Missing Status", dq.missingStatus], ["Missing Group", dq.missingGroup], ["Missing State Officer (Column N)", dq.missingStateOfficer], ["Invalid Sales Value", dq.invalidSales], ["Invalid Reload Amount", dq.invalidAmount], ["Invalid Credit Balance", dq.invalidCredit]];
+  return (
+    <div>
+      <h1 className="text-lg font-semibold text-slate-900 mb-1">Data Quality Summary</h1>
+      <p className="text-sm text-slate-500 mb-4">Semakan automatik ke atas data yang diimport. Tiada rekod dipadam secara automatik.</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="bg-white border border-slate-200 rounded-lg p-3.5 flex items-center justify-between">
+            <span className="text-sm text-slate-600">{label}</span>
+            <span className={`text-sm font-semibold tabular-nums ${value > 0 && label !== "Total Records" && label !== "Valid Records" ? "text-amber-600" : "text-slate-900"}`}>{fmtNum(value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function InsightsPage({ agents, groupStats }) {
+  function topN(list, n) { return list.slice(0, n).map((a) => ({ text: `${a.agentName || "(No Name)"} — ${a.schoolName || "—"} · ${fmtMoney(a.totalSales)} sales · ${a.daysSinceLastReload ?? "—"} hari sejak reload · Priority ${a.priorityScore}` })); }
+  const questions = [
+    { q: "Siapa agent paling perlu saya hubungi hari ini?", fn: () => topN(agents.filter((a) => a.category).sort((a, b) => b.priorityScore - a.priorityScore), 5) },
+    { q: "Agent mana sales tinggi tetapi baki kredit rendah?", fn: () => topN(agents.filter((a) => (a.salesLevel === "TOP_PERFORMER" || a.salesLevel === "HIGH_VALUE") && a.creditLevel === "LOW").sort((a, b) => b.priorityScore - a.priorityScore), 5) },
+    { q: "Siapa agent berisiko tidak aktif?", fn: () => topN(agents.filter((a) => a.activityStatus === "AT_RISK" || a.activityStatus === "INACTIVE").sort((a, b) => b.priorityScore - a.priorityScore), 5) },
+    { q: "Group mana prestasi paling rendah?", fn: () => { const worst = [...groupStats].sort((a, b) => a.totalSales - b.totalSales)[0]; return worst ? [{ text: `${worst.name}: total sales ${fmtMoney(worst.totalSales)}, ${worst.inactive} inactive, ${worst.zeroSales} zero sales.` }] : []; } },
+    { q: "Agent mana sesuai untuk reactivation?", fn: () => topN(agents.filter((a) => a.category === "INACTIVE" || (a.salesLevel === "ZERO" && a.reloadDateEmpty)).sort((a, b) => b.priorityScore - a.priorityScore), 5) },
+    { q: "Siapa peluang reload tertinggi?", fn: () => topN(agents.filter((a) => a.category === "URGENT_RELOAD").sort((a, b) => b.priorityScore - a.priorityScore), 5) },
+  ];
+  const [answer, setAnswer] = useState(null);
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1"><Icon name="sparkles" size={18} className="text-violet-600" /><h1 className="text-lg font-semibold text-slate-900">AI Sales Insight</h1></div>
+      <p className="text-sm text-slate-500 mb-4">Jawapan dikira terus daripada data agent yang telah dianalisis — bukan jawapan rawak.</p>
+      <div className="flex flex-wrap gap-2 mb-5">{questions.map((item) => (
+        <button key={item.q} onClick={() => setAnswer({ q: item.q, results: item.fn() })} className="text-xs font-medium px-3 py-2 rounded-md border border-slate-200 bg-white hover:border-slate-400 text-slate-700">{item.q}</button>
+      ))}</div>
+      {answer && (
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <div className="text-sm font-medium text-slate-800 mb-3">{answer.q}</div>
+          {answer.results.length === 0 && <div className="text-sm text-slate-400">Tiada data sepadan buat masa ini.</div>}
+          <ul className="space-y-2">{answer.results.map((r, i) => <li key={i} className="text-sm text-slate-600 border-l-2 border-violet-300 pl-3 py-0.5">{r.text}</li>)}</ul>
+        </div>
+      )}
+    </div>
+  );
+}
+function SettingsPage({ settings, setSettings, agents, followUps, gDrive }) {
+  const update = (path, value) => setSettings((s) => { const next = { ...s, weights: { ...s.weights } }; if (path in next) next[path] = value; else next.weights[path] = value; return next; });
+  const wTotal = Object.values(settings.weights).reduce((a, b) => a + b, 0);
+  const officerEnabled = agents.some((a) => a.stateOfficer);
+  return (
+    <div className="max-w-xl space-y-6">
+      <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="text-sm font-medium text-slate-800 mb-3">Activity Status Thresholds (days since last reload)</div>
+        {[["activeDays", "Active — reload within"], ["lowDays", "Low Activity — up to"], ["atRiskDays", "At Risk — up to"]].map(([k, label]) => (
+          <div key={k} className="flex items-center justify-between py-2 border-t border-slate-100 first:border-t-0">
+            <span className="text-sm text-slate-600">{label}</span>
+            <div className="flex items-center gap-2"><input type="number" value={settings[k]} onChange={(e) => update(k, Number(e.target.value) || 0)} className="w-20 border border-slate-300 rounded-md px-2 py-1 text-sm text-right" /><span className="text-xs text-slate-400">hari</span></div>
+          </div>
+        ))}
+        <div className="text-xs text-slate-400 mt-2">Melepasi "At Risk" akan ditanda sebagai Inactive.</div>
+      </div>
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3"><div className="text-sm font-medium text-slate-800">Priority Score Weights</div><span className={`text-xs font-medium ${wTotal === 100 ? "text-emerald-600" : "text-amber-600"}`}>Total: {wTotal}%</span></div>
+        {[["sales", "Sales Value Score"], ["recency", "Reload Recency Score"], ["credit", "Credit Balance Opportunity"], ["status", "Agent Status"], ["reloadAmt", "Last Reload Amount"], ["risk", "Other Risk / Opportunity"]].map(([k, label]) => (
+          <div key={k} className="py-2 border-t border-slate-100 first:border-t-0">
+            <div className="flex items-center justify-between mb-1"><span className="text-sm text-slate-600">{label}</span><span className="text-xs text-slate-500 tabular-nums">{settings.weights[k]}%</span></div>
+            <input type="range" min={0} max={100} value={settings.weights[k]} onChange={(e) => update(k, Number(e.target.value))} className="w-full" />
+          </div>
+        ))}
+        {wTotal !== 100 && <div className="text-xs text-amber-600 mt-2">Cadangan: pastikan jumlah weight = 100% untuk skor yang tepat (sistem akan normalize secara automatik).</div>}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="text-sm font-medium text-slate-800 mb-1">State Officer</div>
+        <div className="text-xs text-slate-500 leading-relaxed">Data State Officer diambil terus daripada <span className="font-medium">Column N</span> di dalam worksheet <span className="font-medium">TOPUP APPS AGENT</span> — filter "All State Officers" akan muncul secara automatik di bar filter global apabila data ini wujud.</div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="text-sm font-medium text-slate-800 mb-1">Export Data</div>
+        <div className="text-xs text-slate-500 mb-3">Muat turun Excel yang telah dikemaskini (data asal + analisis + status follow-up) ke storan peranti anda.</div>
+        <button onClick={() => downloadExcel(agents, followUps, officerEnabled)} className="flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-700">
+          <Icon name="upload" size={15} /> Muat Turun Excel Terkini
+        </button>
+
+        <div className="border-t border-slate-100 mt-4 pt-4">
+          <div className="text-sm font-medium text-slate-800 mb-1">Google Drive (Pilihan)</div>
+          <div className="text-xs text-slate-500 mb-3 leading-relaxed">
+            Memerlukan Google OAuth Client ID sendiri (Google Cloud Console → APIs & Services → Credentials → OAuth Client ID → Web application) dengan domain fail ini didaftarkan sebagai Authorized JavaScript origin. <span className="font-medium text-amber-600">Fail ini mesti dihoskan di http/https</span> — sign-in Google TIDAK berfungsi jika dibuka terus dari fail tempatan (file://). Guna pelayan tempatan ringkas (cth. <code>npx serve .</code>) atau host di GitHub Pages/Netlify.
+          </div>
+          {window.location.protocol === "file:" && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2.5 mb-3 flex gap-2"><Icon name="alertTriangle" size={14} className="shrink-0 mt-0.5" /><span>Fail ini sedang dibuka terus dari storan tempatan (file://). Google Sign-In kemungkinan besar akan gagal sehingga fail dihoskan di http/https.</span></div>
+          )}
+          <input value={gDrive.clientId} onChange={(e) => gDrive.setClientId(e.target.value)} placeholder="Google OAuth Client ID" className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm mb-2" />
+          <div className="flex gap-2">
+            <button disabled={!gDrive.clientId} onClick={gDrive.signIn} className="flex-1 text-sm font-medium px-3 py-2 rounded-md border border-slate-300 disabled:opacity-40 hover:bg-slate-50">Sign in with Google</button>
+            <button disabled={!gDrive.token} onClick={() => gDrive.upload(agents, followUps, officerEnabled)} className="flex-1 text-sm font-medium px-3 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-40 hover:bg-emerald-700">Upload ke Drive</button>
+          </div>
+          {gDrive.status && <div className="text-xs text-slate-500 mt-2">{gDrive.status}</div>}
+        </div>
+      </div>
+
+      <button onClick={() => setSettings(DEFAULT_SETTINGS)} className="text-sm text-slate-500 underline">Reset to default</button>
+    </div>
+  );
+}
+
+/* ============================================================================
+   NAVIGATION
+============================================================================ */
+const NAV_ITEMS = [
+  { id: "dashboard", label: "Dashboard", icon: "home" },
+  { id: "action", label: "Sales Action Center", icon: "target" },
+  { id: "agents", label: "Agents", icon: "users" },
+  { id: "reload", label: "Reload Opportunities", icon: "creditCard" },
+  { id: "reactivation", label: "Reactivation", icon: "refresh" },
+  { id: "groups", label: "Group Performance", icon: "chart" },
+  { id: "insights", label: "AI Insight", icon: "sparkles" },
+  { id: "quality", label: "Data Quality", icon: "shield" },
+  { id: "settings", label: "Settings", icon: "settings" },
+];
+const MOBILE_NAV = ["dashboard", "action", "agents", "groups", "settings"];
+function Sidebar({ page, setPage, onReimport, agentCount, onExport }) {
+  return (
+    <div className="hidden lg:flex flex-col w-60 shrink-0 bg-slate-900 text-slate-300 h-screen sticky top-0">
+      <div className="px-5 py-5 flex items-center gap-2.5 border-b border-slate-800">
+        <div className="w-8 h-8 rounded-md bg-white flex items-center justify-center shrink-0"><Icon name="target" size={16} className="text-slate-900" /></div>
+        <div className="min-w-0"><div className="text-sm font-semibold text-white truncate">TOPUP Agent</div><div className="text-[11px] text-slate-500 truncate">Sales Action Center</div></div>
+      </div>
+      <nav className="flex-1 py-3 overflow-y-auto">
+        {NAV_ITEMS.map((item) => {
+          const active = page === item.id;
+          return <button key={item.id} onClick={() => setPage(item.id)} className={`w-full flex items-center gap-2.5 px-5 py-2.5 text-sm transition-colors ${active ? "bg-slate-800 text-white font-medium border-r-2 border-white" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"}`}><Icon name={item.icon} size={16} /> {item.label}</button>;
+        })}
+      </nav>
+      <div className="p-3 border-t border-slate-800 space-y-1">
+        <div className="px-2 text-[11px] text-slate-500">{agentCount} agents loaded</div>
+        <button onClick={onExport} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-slate-400 hover:text-white rounded-md hover:bg-slate-800"><Icon name="upload" size={14} /> Export Excel Terkini</button>
+        <button onClick={onReimport} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-slate-400 hover:text-white rounded-md hover:bg-slate-800"><Icon name="file" size={14} /> Import Excel Baru</button>
+      </div>
+    </div>
+  );
+}
+function TopBar({ setMobileMenuOpen, page }) {
+  const item = NAV_ITEMS.find((n) => n.id === page);
+  return (
+    <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+      <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 -ml-1.5 rounded-md hover:bg-slate-100"><Icon name="menu" size={20} /></button>
+      <div className="font-semibold text-slate-900 text-sm">{item?.label || "TOPUP Agent"}</div>
+    </div>
+  );
+}
+function MobileMenu({ open, onClose, page, setPage, onReimport }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <div className="absolute inset-0 bg-slate-900/50" onClick={onClose} />
+      <div className="absolute left-0 top-0 bottom-0 w-72 bg-slate-900 text-slate-300 flex flex-col">
+        <div className="px-5 py-5 flex items-center justify-between border-b border-slate-800"><div className="text-sm font-semibold text-white">TOPUP Agent</div><button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-800"><Icon name="x" size={18} /></button></div>
+        <nav className="flex-1 py-3 overflow-y-auto">
+          {NAV_ITEMS.map((item) => { const active = page === item.id; return <button key={item.id} onClick={() => { setPage(item.id); onClose(); }} className={`w-full flex items-center gap-2.5 px-5 py-3 text-sm ${active ? "bg-slate-800 text-white font-medium" : "text-slate-400"}`}><Icon name={item.icon} size={16} /> {item.label}</button>; })}
+        </nav>
+        <div className="p-3 border-t border-slate-800"><button onClick={() => { onReimport(); onClose(); }} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-slate-400 rounded-md hover:bg-slate-800"><Icon name="file" size={14} /> Import Excel Baru</button></div>
+      </div>
+    </div>
+  );
+}
+function BottomNav({ page, setPage }) {
+  return (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 flex justify-around py-1.5">
+      {MOBILE_NAV.map((id) => { const item = NAV_ITEMS.find((n) => n.id === id); const active = page === id; return (
+        <button key={id} onClick={() => setPage(id)} className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md ${active ? "text-slate-900" : "text-slate-400"}`}><Icon name={item.icon} size={19} /><span className="text-[10px] font-medium">{item.label.split(" ")[0]}</span></button>
+      ); })}
+    </div>
+  );
+}
+
+/* ============================================================================
+   MAIN APP
+============================================================================ */
+function useGoogleDrive() {
+  const [clientId, setClientId] = useState("");
+  const [token, setToken] = useState(null);
+  const [status, setStatus] = useState("");
+  const gisLoadingRef = useRef(false);
+
+  const ensureGis = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      if (window.google?.accounts?.oauth2) return resolve();
+      if (gisLoadingRef.current) {
+        const check = setInterval(() => { if (window.google?.accounts?.oauth2) { clearInterval(check); resolve(); } }, 150);
+        return;
+      }
+      gisLoadingRef.current = true;
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Gagal memuatkan Google Sign-In."));
+      document.head.appendChild(script);
+    });
+  }, []);
+
+  const signIn = useCallback(async () => {
+    if (!clientId) return;
+    setStatus("Menyambung ke Google...");
+    try {
+      await ensureGis();
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "https://www.googleapis.com/auth/drive.file",
+        callback: (resp) => {
+          if (resp.access_token) { setToken(resp.access_token); setStatus("Berjaya sign in ke Google."); }
+          else setStatus("Sign in gagal atau dibatalkan.");
+        },
+      });
+      tokenClient.requestAccessToken();
+    } catch (err) {
+      setStatus(err.message || "Ralat menyambung ke Google.");
+    }
+  }, [clientId, ensureGis]);
+
+  const upload = useCallback(async (agents, followUps, officerEnabled) => {
+    if (!token) return;
+    setStatus("Memuat naik ke Google Drive...");
+    try {
+      const res = await uploadToGoogleDrive(agents, followUps, officerEnabled, token);
+      setStatus(`Berjaya dimuat naik: ${res.name}${res.webViewLink ? " — " + res.webViewLink : ""}`);
+    } catch (err) {
+      setStatus(err.message || "Muat naik ke Google Drive gagal.");
+    }
+  }, [token]);
+
+  return { clientId, setClientId, token, status, signIn, upload };
+}
+
+function App() {
+  const [rawRows, setRawRows] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [importError, setImportError] = useState("");
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [page, setPage] = useState("dashboard");
+  const [selectedAgent, setSelectedAgent] = useState(null);
+  const [followUps, setFollowUps] = useState({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [filters, setFilters] = useState({});
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState("priorityScore");
+  const [sortDir, setSortDir] = useState("desc");
+  const gDrive = useGoogleDrive();
+
+  const handleFile = useCallback((file) => {
+    setImportError(""); setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const targetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === SHEET_NAME.toLowerCase());
+        if (!targetName) { setImportError(`Worksheet "${SHEET_NAME}" tidak dijumpai. Sila gunakan fail yang mengandungi worksheet tersebut.`); setRawRows(null); return; }
+        const ws = workbook.Sheets[targetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+        const test = extractRawRecords(rows);
+        if (test.length === 0) { setImportError("Tiada rekod agent dijumpai bermula dari Row 11. Sila semak fail Excel anda."); setRawRows(null); return; }
+        setRawRows(rows); setPage("dashboard");
+      } catch (err) { setImportError("Ralat membaca fail Excel. Sila pastikan format fail adalah .xlsx atau .xls yang sah."); setRawRows(null); }
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
+  const records = useMemo(() => (rawRows ? extractRawRecords(rawRows) : []), [rawRows]);
+  const agents = useMemo(() => (records.length ? computeAgents(records, settings) : []), [records, settings]);
+  const dataQuality = useMemo(() => (records.length ? computeDataQuality(records) : null), [records]);
+  const hasActiveFilter = Boolean(filters.group || filters.status || filters.activityStatus || filters.salesLevel || filters.priorityLevel || filters.creditLevel || filters.stateOfficer || search);
+  const filteredAgents = useMemo(() => applyFilters(agents, filters, search), [agents, filters, search]);
+  const groupStats = useMemo(() => computeGroupStats(filteredAgents), [filteredAgents]);
+  const updateFollowUp = useCallback((key, val) => setFollowUps((f) => ({ ...f, [key]: val })), []);
+
+  if (!rawRows) {
+    return <div className="min-h-screen bg-slate-50 font-sans text-slate-900"><ImportPage onFile={handleFile} error={importError} fileName={fileName} /></div>;
+  }
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
+      <Sidebar page={page} setPage={setPage} onReimport={() => setRawRows(null)} agentCount={agents.length} onExport={() => downloadExcel(filteredAgents, followUps, agents.some((a) => a.stateOfficer))} />
+      <MobileMenu open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} page={page} setPage={setPage} onReimport={() => setRawRows(null)} />
+      <div className="flex-1 min-w-0 pb-16 lg:pb-0">
+        <TopBar setMobileMenuOpen={setMobileMenuOpen} page={page} />
+        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+          {page !== "settings" && page !== "quality" && (
+            <React.Fragment>
+              <FilterBar agents={agents} filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} />
+              {hasActiveFilter && <div className="text-xs text-slate-500 mb-4 -mt-2">Menunjukkan <span className="font-medium text-slate-700">{filteredAgents.length}</span> daripada {agents.length} agent (ditapis).</div>}
+            </React.Fragment>
+          )}
+          {page === "dashboard" && <DashboardPage agents={filteredAgents} groupStats={groupStats} onOpenAgent={setSelectedAgent} dataQuality={dataQuality} />}
+          {page === "action" && <ActionCenterPage agents={filteredAgents} onOpenAgent={setSelectedAgent} />}
+          {page === "agents" && <AgentsPage agents={filteredAgents} onOpenAgent={setSelectedAgent} sortKey={sortKey} setSortKey={setSortKey} sortDir={sortDir} setSortDir={setSortDir} />}
+          {page === "reload" && <ReloadOpportunitiesPage agents={filteredAgents} onOpenAgent={setSelectedAgent} />}
+          {page === "reactivation" && <ReactivationPage agents={filteredAgents} onOpenAgent={setSelectedAgent} />}
+          {page === "groups" && <GroupPerformancePage groupStats={groupStats} />}
+          {page === "insights" && <InsightsPage agents={filteredAgents} groupStats={groupStats} />}
+          {page === "quality" && <DataQualityPage dataQuality={dataQuality} />}
+          {page === "settings" && <SettingsPage settings={settings} setSettings={setSettings} agents={filteredAgents} followUps={followUps} gDrive={gDrive} />}
+        </div>
+      </div>
+      <BottomNav page={page} setPage={setPage} />
+      {selectedAgent && <AgentProfileModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} followUp={followUps[selectedAgent.key]} onUpdateFollowUp={updateFollowUp} />}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
