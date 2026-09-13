@@ -340,53 +340,70 @@ function computeGroupStats(agents) {
 }
 
 /* ============================================================================
-   EXPORT — Updated Excel (download) + Google Drive upload
+   EXPORT — Round-trip Excel (download) + Google Drive upload
+   Original columns A-T and row positions are preserved exactly as imported;
+   new analysis/follow-up columns are appended AFTER the original data, and
+   the worksheet keeps the exact name "TOPUP APPS AGENT" so the file can be
+   re-imported directly without breaking the fixed column-position parser.
 ============================================================================ */
-function buildExportSheetRows(agents, followUps, officerEnabled) {
-  const header = [
-    "School Name", "Agent Name", "Phone Number", "Email", "Status", "Group",
-    ...(officerEnabled ? ["State Officer"] : []),
-    "Total Sales 24-26", "Credit Balance", "Last Reload Date", "Last Reload Amount",
-    "Days Since Last Reload", "Activity Status", "Sales Level", "Credit Level",
-    "Priority Score", "Priority Level", "Recommended Action", "Action Reason",
-    "Follow-Up Status", "Follow-Up Notes", "Follow-Up Date", "Next Action Date",
-  ];
-  const rows = agents.map((a) => {
-    const fu = followUps[a.key] || {};
-    return [
-      a.schoolName, a.agentName, a.phoneNumber, a.email, a.status, a.group,
-      ...(officerEnabled ? [a.stateOfficer || ""] : []),
-      a.totalSales ?? "", a.creditBalance ?? "",
-      a.lastReloadDate ? a.lastReloadDate.toLocaleDateString("en-MY") : (a.reloadDateInvalid ? "INVALID" : ""),
-      a.lastReloadAmount ?? "", a.daysSinceLastReload ?? "",
-      ACTIVITY_META[a.activityStatus].label, SALES_META[a.salesLevel].label, CREDIT_META[a.creditLevel].label,
-      a.priorityScore, PRIORITY_META[a.priorityLevel].label, ACTION_META[a.recommendedAction].label, a.actionReason,
-      fu.status || "", fu.notes || "", fu.followUpDate || "", fu.nextActionDate || "",
-    ];
+const EXPORT_EXTRA_HEADERS = [
+  "Activity Status", "Sales Level", "Credit Level", "Days Since Last Reload",
+  "Priority Score", "Priority Level", "Recommended Action", "Action Reason",
+  "Follow-Up Status", "Follow-Up Notes", "Follow-Up Date", "Next Action Date",
+];
+function buildRoundTripExportRows(rawRows, agents, followUps) {
+  const baseCols = Math.max(COL.RELOAD_AMT + 1, ...rawRows.map((r) => (r ? r.length : 0)));
+  const startCol = baseCols;
+  const totalCols = startCol + EXPORT_EXTRA_HEADERS.length;
+  const out = rawRows.map((row) => {
+    const copy = new Array(totalCols).fill("");
+    (row || []).forEach((v, i) => { copy[i] = v; });
+    return copy;
   });
-  return [header, ...rows];
+  while (out.length <= DATA_START_ROW_INDEX) out.push(new Array(totalCols).fill(""));
+  const headerRowIdx = Math.max(0, DATA_START_ROW_INDEX - 1);
+  EXPORT_EXTRA_HEADERS.forEach((h, i) => { out[headerRowIdx][startCol + i] = h; });
+  agents.forEach((a) => {
+    const idx = a.rowIndex - 1;
+    while (out.length <= idx) out.push(new Array(totalCols).fill(""));
+    const fu = followUps[a.key] || {};
+    const row = out[idx];
+    row[startCol + 0] = ACTIVITY_META[a.activityStatus].label;
+    row[startCol + 1] = SALES_META[a.salesLevel].label;
+    row[startCol + 2] = CREDIT_META[a.creditLevel].label;
+    row[startCol + 3] = a.daysSinceLastReload ?? "";
+    row[startCol + 4] = a.priorityScore;
+    row[startCol + 5] = PRIORITY_META[a.priorityLevel].label;
+    row[startCol + 6] = ACTION_META[a.recommendedAction].label;
+    row[startCol + 7] = a.actionReason;
+    row[startCol + 8] = fu.status || "";
+    row[startCol + 9] = fu.notes || "";
+    row[startCol + 10] = fu.followUpDate || "";
+    row[startCol + 11] = fu.nextActionDate || "";
+  });
+  return out;
 }
-function exportWorkbook(agents, followUps, officerEnabled) {
-  const aoa = buildExportSheetRows(agents, followUps, officerEnabled);
+function exportWorkbook(rawRows, agents, followUps) {
+  const aoa = buildRoundTripExportRows(rawRows, agents, followUps);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "TOPUP APPS AGENT - UPDATED");
+  XLSX.utils.book_append_sheet(wb, ws, SHEET_NAME);
   return wb;
 }
-function downloadExcel(agents, followUps, officerEnabled) {
-  const wb = exportWorkbook(agents, followUps, officerEnabled);
+function downloadExcel(rawRows, agents, followUps) {
+  const wb = exportWorkbook(rawRows, agents, followUps);
   const stamp = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `topup-agent-updated-${stamp}.xlsx`);
+  XLSX.writeFile(wb, `topup-apps-agent-${stamp}.xlsx`);
 }
 function workbookToBlob(wb) {
   const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   return new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
-async function uploadToGoogleDrive(agents, followUps, officerEnabled, accessToken) {
-  const wb = exportWorkbook(agents, followUps, officerEnabled);
+async function uploadToGoogleDrive(rawRows, agents, followUps, accessToken) {
+  const wb = exportWorkbook(rawRows, agents, followUps);
   const blob = workbookToBlob(wb);
   const stamp = new Date().toISOString().slice(0, 10);
-  const fileName = `topup-agent-updated-${stamp}.xlsx`;
+  const fileName = `topup-apps-agent-${stamp}.xlsx`;
   const metadata = { name: fileName, mimeType: blob.type };
   const form = new FormData();
   form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
@@ -984,7 +1001,7 @@ function InsightsPage({ agents, groupStats }) {
     </div>
   );
 }
-function SettingsPage({ settings, setSettings, agents, followUps, gDrive }) {
+function SettingsPage({ settings, setSettings, agents, followUps, gDrive, rawRows }) {
   const update = (path, value) => setSettings((s) => { const next = { ...s, weights: { ...s.weights } }; if (path in next) next[path] = value; else next.weights[path] = value; return next; });
   const wTotal = Object.values(settings.weights).reduce((a, b) => a + b, 0);
   const officerEnabled = agents.some((a) => a.stateOfficer);
@@ -1020,7 +1037,7 @@ function SettingsPage({ settings, setSettings, agents, followUps, gDrive }) {
       <div className="bg-white border border-slate-200 rounded-lg p-4">
         <div className="text-sm font-medium text-slate-800 mb-1">Export Data</div>
         <div className="text-xs text-slate-500 mb-3">Muat turun Excel yang telah dikemaskini (data asal + analisis + status follow-up) ke storan peranti anda.</div>
-        <button onClick={() => downloadExcel(agents, followUps, officerEnabled)} className="flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-700">
+        <button onClick={() => downloadExcel(rawRows, agents, followUps)} className="flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-700">
           <Icon name="upload" size={15} /> Muat Turun Excel Terkini
         </button>
 
@@ -1035,7 +1052,7 @@ function SettingsPage({ settings, setSettings, agents, followUps, gDrive }) {
           <input value={gDrive.clientId} onChange={(e) => gDrive.setClientId(e.target.value)} placeholder="Google OAuth Client ID" className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm mb-2" />
           <div className="flex gap-2">
             <button disabled={!gDrive.clientId} onClick={gDrive.signIn} className="flex-1 text-sm font-medium px-3 py-2 rounded-md border border-slate-300 disabled:opacity-40 hover:bg-slate-50">Sign in with Google</button>
-            <button disabled={!gDrive.token} onClick={() => gDrive.upload(agents, followUps, officerEnabled)} className="flex-1 text-sm font-medium px-3 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-40 hover:bg-emerald-700">Upload ke Drive</button>
+            <button disabled={!gDrive.token} onClick={() => gDrive.upload(rawRows, agents, followUps)} className="flex-1 text-sm font-medium px-3 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-40 hover:bg-emerald-700">Upload ke Drive</button>
           </div>
           {gDrive.status && <div className="text-xs text-slate-500 mt-2">{gDrive.status}</div>}
         </div>
@@ -1245,11 +1262,11 @@ function useGoogleDrive() {
     return res.json();
   }, [token]);
 
-  const upload = useCallback(async (agents, followUps, officerEnabled) => {
+  const upload = useCallback(async (rawRows, agents, followUps) => {
     if (!token) return;
     setStatus("Memuat naik ke Google Drive...");
     try {
-      const res = await uploadToGoogleDrive(agents, followUps, officerEnabled, token);
+      const res = await uploadToGoogleDrive(rawRows, agents, followUps, token);
       setStatus(`Berjaya dimuat naik: ${res.name}${res.webViewLink ? " — " + res.webViewLink : ""}`);
     } catch (err) {
       setStatus(err.message || "Muat naik ke Google Drive gagal.");
@@ -1353,7 +1370,7 @@ function App() {
   }
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-      <Sidebar page={page} setPage={setPage} onReimport={() => { setRawRows(null); setDriveFile(null); }} agentCount={agents.length} onExport={() => downloadExcel(filteredAgents, followUps, agents.some((a) => a.stateOfficer))} driveFile={driveFile} onRefreshDrive={refreshFromDrive} />
+      <Sidebar page={page} setPage={setPage} onReimport={() => { setRawRows(null); setDriveFile(null); }} agentCount={agents.length} onExport={() => downloadExcel(rawRows, agents, followUps)} driveFile={driveFile} onRefreshDrive={refreshFromDrive} />
       <MobileMenu open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} page={page} setPage={setPage} onReimport={() => { setRawRows(null); setDriveFile(null); }} />
       <div className="flex-1 min-w-0 pb-16 lg:pb-0">
         <TopBar setMobileMenuOpen={setMobileMenuOpen} page={page} />
@@ -1378,7 +1395,7 @@ function App() {
           {page === "groups" && <GroupPerformancePage groupStats={groupStats} />}
           {page === "insights" && <InsightsPage agents={filteredAgents} groupStats={groupStats} />}
           {page === "quality" && <DataQualityPage dataQuality={dataQuality} />}
-          {page === "settings" && <SettingsPage settings={settings} setSettings={setSettings} agents={filteredAgents} followUps={followUps} gDrive={gDrive} />}
+          {page === "settings" && <SettingsPage settings={settings} setSettings={setSettings} agents={agents} followUps={followUps} gDrive={gDrive} rawRows={rawRows} />}
         </div>
       </div>
       <BottomNav page={page} setPage={setPage} />
