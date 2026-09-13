@@ -22,7 +22,7 @@
 <div id="root"></div>
 
 <script type="text/babel" data-presets="react">
-const { useState, useMemo, useCallback, useRef } = React;
+const { useState, useMemo, useCallback, useRef, useEffect } = React;
 
 /* ============================================================================
    ICONS (self-contained, no external icon library)
@@ -190,35 +190,55 @@ function computeDataQuality(records) {
     if (r.email) emailCount[r.email.toLowerCase()] = (emailCount[r.email.toLowerCase()] || 0) + 1;
     if (r.phoneNumber) phoneCount[r.phoneNumber] = (phoneCount[r.phoneNumber] || 0) + 1;
   });
-  let missingSchool = 0, missingAgent = 0, missingPhone = 0, missingEmail = 0, missingStatus = 0, missingGroup = 0,
-    invalidSales = 0, invalidDate = 0, invalidAmount = 0, invalidCredit = 0, noSales = 0, zeroCredit = 0,
-    dupEmail = 0, dupPhone = 0, incomplete = 0, missingStateOfficer = 0;
+  const details = {
+    missingSchool: [], missingAgent: [], missingPhone: [], missingEmail: [],
+    missingStatus: [], missingGroup: [], missingStateOfficer: [],
+    invalidSales: [], invalidCredit: [], invalidAmount: [], invalidReloadDate: [],
+    noSales: [], zeroCredit: [], duplicateEmailRecords: [], duplicatePhoneRecords: [],
+    incompleteRecords: [], validRecords: [], missingReloadDate: [],
+  };
   records.forEach((r) => {
     let bad = false;
-    if (!r.schoolName) { missingSchool++; bad = true; }
-    if (!r.agentName) { missingAgent++; bad = true; }
-    if (!r.phoneNumber) { missingPhone++; bad = true; }
-    if (!r.email) { missingEmail++; bad = true; }
-    if (!r.status) { missingStatus++; bad = true; }
-    if (!r.group) { missingGroup++; bad = true; }
-    if (!r.stateOfficer) { missingStateOfficer++; }
-    if (r._raw.salesRaw !== "" && r.totalSales === null) { invalidSales++; bad = true; }
-    if (r._raw.creditRaw !== "" && r.creditBalance === null) { invalidCredit++; bad = true; }
-    if (r._raw.reloadAmtRaw !== "" && r.lastReloadAmount === null) { invalidAmount++; bad = true; }
-    if (r.reloadDateInvalid) { invalidDate++; bad = true; }
-    if (r.totalSales === 0) noSales++;
-    if (r.creditBalance === 0) zeroCredit++;
-    if (r.email && emailCount[r.email.toLowerCase()] > 1) dupEmail++;
-    if (r.phoneNumber && phoneCount[r.phoneNumber] > 1) dupPhone++;
-    if (bad) incomplete++;
+    if (!r.schoolName) { details.missingSchool.push(r); bad = true; }
+    if (!r.agentName) { details.missingAgent.push(r); bad = true; }
+    if (!r.phoneNumber) { details.missingPhone.push(r); bad = true; }
+    if (!r.email) { details.missingEmail.push(r); bad = true; }
+    if (!r.status) { details.missingStatus.push(r); bad = true; }
+    if (!r.group) { details.missingGroup.push(r); bad = true; }
+    if (!r.stateOfficer) { details.missingStateOfficer.push(r); }
+    if (r._raw.salesRaw !== "" && r.totalSales === null) { details.invalidSales.push(r); bad = true; }
+    if (r._raw.creditRaw !== "" && r.creditBalance === null) { details.invalidCredit.push(r); bad = true; }
+    if (r._raw.reloadAmtRaw !== "" && r.lastReloadAmount === null) { details.invalidAmount.push(r); bad = true; }
+    if (r.reloadDateInvalid) { details.invalidReloadDate.push(r); bad = true; }
+    if (r.reloadDateEmpty) details.missingReloadDate.push(r);
+    if (r.totalSales === 0) details.noSales.push(r);
+    if (r.creditBalance === 0) details.zeroCredit.push(r);
+    if (r.email && emailCount[r.email.toLowerCase()] > 1) details.duplicateEmailRecords.push(r);
+    if (r.phoneNumber && phoneCount[r.phoneNumber] > 1) details.duplicatePhoneRecords.push(r);
+    if (bad) details.incompleteRecords.push(r); else details.validRecords.push(r);
   });
-  return {
-    totalRecords: records.length, validRecords: records.length - incomplete, incompleteRecords: incomplete,
-    duplicateEmailRecords: dupEmail, duplicatePhoneRecords: dupPhone,
-    missingReloadDate: records.filter((r) => r.reloadDateEmpty).length, invalidReloadDate: invalidDate,
-    noSales, zeroCredit, missingSchool, missingAgent, missingPhone, missingEmail, missingStatus, missingGroup,
-    invalidSales, invalidAmount, invalidCredit, missingStateOfficer,
+  const summary = {
+    totalRecords: records.length,
+    validRecords: details.validRecords.length,
+    incompleteRecords: details.incompleteRecords.length,
+    duplicateEmailRecords: details.duplicateEmailRecords.length,
+    duplicatePhoneRecords: details.duplicatePhoneRecords.length,
+    missingReloadDate: details.missingReloadDate.length,
+    invalidReloadDate: details.invalidReloadDate.length,
+    noSales: details.noSales.length,
+    zeroCredit: details.zeroCredit.length,
+    missingSchool: details.missingSchool.length,
+    missingAgent: details.missingAgent.length,
+    missingPhone: details.missingPhone.length,
+    missingEmail: details.missingEmail.length,
+    missingStatus: details.missingStatus.length,
+    missingGroup: details.missingGroup.length,
+    missingStateOfficer: details.missingStateOfficer.length,
+    invalidSales: details.invalidSales.length,
+    invalidAmount: details.invalidAmount.length,
+    invalidCredit: details.invalidCredit.length,
   };
+  return { summary, details, all: records };
 }
 function computeAgents(records, settings) {
   const today = new Date();
@@ -595,9 +615,11 @@ function applyFilters(agents, filters, search) {
 /* ============================================================================
    PAGES
 ============================================================================ */
-function ImportPage({ onFile, error, fileName }) {
+function ImportPage({ onFile, error, fileName, gDrive, onDrivePicked }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+  const [showDrive, setShowDrive] = useState(false);
+  const canPick = Boolean(gDrive.token && gDrive.apiKey);
   return (
     <div className="max-w-xl mx-auto mt-6 sm:mt-16 px-4">
       <div className="text-center mb-6">
@@ -613,6 +635,25 @@ function ImportPage({ onFile, error, fileName }) {
       </div>
       {fileName && !error && <div className="text-xs text-slate-500 mt-3 text-center">Loaded: {fileName}</div>}
       {error && <div className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3.5 flex gap-2"><Icon name="alertTriangle" size={16} className="shrink-0 mt-0.5" /> <span>{error}</span></div>}
+
+      <div className="mt-6 border-t border-slate-200 pt-5">
+        <button onClick={() => setShowDrive((s) => !s)} className="text-sm font-medium text-slate-600 flex items-center gap-1.5 mx-auto">
+          <Icon name="file" size={15} /> Atau import terus daripada Google Drive {showDrive ? "▲" : "▼"}
+        </button>
+        {showDrive && (
+          <div className="mt-3 space-y-2.5 bg-slate-50 border border-slate-200 rounded-lg p-4">
+            <input value={gDrive.clientId} onChange={(e) => gDrive.setClientId(e.target.value)} placeholder="Google OAuth Client ID" className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm" />
+            <input value={gDrive.apiKey} onChange={(e) => gDrive.setApiKey(e.target.value)} placeholder="Google API Key" className="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm" />
+            <div className="flex gap-2">
+              <button disabled={!gDrive.clientId} onClick={gDrive.signIn} className="flex-1 text-sm font-medium px-3 py-2 rounded-md border border-slate-300 disabled:opacity-40 hover:bg-white">{gDrive.token ? "Sudah Sign In ✓" : "Sign in with Google"}</button>
+              <button disabled={!canPick} onClick={() => gDrive.pickFile(onDrivePicked)} className="flex-1 text-sm font-medium px-3 py-2 rounded-md bg-slate-900 text-white disabled:opacity-40 hover:bg-slate-700">Pilih Fail dari Drive</button>
+            </div>
+            {gDrive.status && <div className="text-xs text-slate-500">{gDrive.status}</div>}
+            <div className="text-xs text-slate-400 leading-relaxed">Perlukan Google Cloud project dengan "Google Picker API" diaktifkan, dan satu API Key (Credentials → Create Credentials → API Key). OAuth Client ID sama seperti untuk Upload ke Drive.</div>
+          </div>
+        )}
+      </div>
+
       <div className="mt-6 text-xs text-slate-400 leading-relaxed">Column digunakan: B (Email), E (Status), G (Agent Name), H (Phone), M (School Name), O (Total Sales 24-26), Q (Group), R (Credit Balance), S (Date Last Reload), T (Amount Last Reload).</div>
     </div>
   );
@@ -688,7 +729,7 @@ function DashboardPage({ agents, groupStats, onOpenAgent, dataQuality }) {
           ))}</tbody>
         </table>
       </div>
-      {dataQuality.incompleteRecords > 0 && <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 items-start"><Icon name="alertTriangle" size={14} className="shrink-0 mt-0.5" /><span>{dataQuality.incompleteRecords} rekod mempunyai data yang tidak lengkap atau tidak sah. Lihat halaman Data Quality untuk butiran.</span></div>}
+      {dataQuality.summary.incompleteRecords > 0 && <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 flex gap-2 items-start"><Icon name="alertTriangle" size={14} className="shrink-0 mt-0.5" /><span>{dataQuality.summary.incompleteRecords} rekod mempunyai data yang tidak lengkap atau tidak sah. Lihat halaman Data Quality untuk butiran.</span></div>}
     </div>
   );
 }
@@ -834,21 +875,84 @@ function GroupPerformancePage({ groupStats }) {
     </div>
   );
 }
+function exportRecordsList(records, label, bookType) {
+  const header = ["School Name", "Agent Name", "Phone Number", "Email", "Status", "Group", "State Officer", "Total Sales 24-26", "Credit Balance", "Last Reload Date (raw)", "Last Reload Amount"];
+  const rows = records.map((r) => [
+    r.schoolName, r.agentName, r.phoneNumber, r.email, r.status, r.group, r.stateOfficer,
+    r.totalSales ?? "", r.creditBalance ?? "", r._raw.reloadDateRaw, r.lastReloadAmount ?? "",
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, label.slice(0, 31));
+  const ext = bookType === "biff8" ? "xls" : "xlsx";
+  const stamp = new Date().toISOString().slice(0, 10);
+  const safeName = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  XLSX.writeFile(wb, `data-quality-${safeName}-${stamp}.${ext}`, { bookType });
+}
+function DataQualityDrilldownModal({ metric, records, onClose }) {
+  if (!metric) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl max-h-[85vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+          <div><div className="text-base font-semibold text-slate-900">{metric.label}</div><div className="text-xs text-slate-500">{records.length} rekod</div></div>
+          <button onClick={onClose} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"><Icon name="x" size={18} /></button>
+        </div>
+        <div className="p-5">
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => exportRecordsList(records, metric.label, "xlsx")} className="text-xs font-medium px-3 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-700">Muat Turun .xlsx</button>
+            <button onClick={() => exportRecordsList(records, metric.label, "biff8")} className="text-xs font-medium px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-50">Muat Turun .xls</button>
+          </div>
+          <div className="border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead><tr className="text-xs text-slate-400 border-b border-slate-100"><th className="text-left px-3 py-2">Agent</th><th className="text-left px-3 py-2">School</th><th className="text-left px-3 py-2">Phone</th><th className="text-left px-3 py-2">Email</th><th className="text-left px-3 py-2">Group</th></tr></thead>
+              <tbody>{records.slice(0, 300).map((r, i) => (
+                <tr key={i} className="border-b border-slate-50">
+                  <td className="px-3 py-2 font-medium text-slate-800">{r.agentName || "—"}</td>
+                  <td className="px-3 py-2 text-slate-500">{r.schoolName || "—"}</td>
+                  <td className="px-3 py-2 text-slate-500">{r.phoneNumber || "—"}</td>
+                  <td className="px-3 py-2 text-slate-500">{r.email || "—"}</td>
+                  <td className="px-3 py-2 text-slate-500">{r.group || "—"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            {records.length > 300 && <div className="text-xs text-slate-400 text-center py-2 border-t border-slate-100">Menunjukkan 300 daripada {records.length} — muat turun Excel untuk senarai penuh.</div>}
+            {records.length === 0 && <div className="text-center text-sm text-slate-400 py-8">Tiada rekod.</div>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function DataQualityPage({ dataQuality }) {
-  const dq = dataQuality;
-  const rows = [["Total Records", dq.totalRecords], ["Valid Records", dq.validRecords], ["Incomplete Records", dq.incompleteRecords], ["Duplicate Email Records", dq.duplicateEmailRecords], ["Duplicate Phone Records", dq.duplicatePhoneRecords], ["Missing Reload Date", dq.missingReloadDate], ["Invalid Reload Date", dq.invalidReloadDate], ["No Sales (Zero)", dq.noSales], ["Zero Credit", dq.zeroCredit], ["Missing School Name", dq.missingSchool], ["Missing Agent Name", dq.missingAgent], ["Missing Phone Number", dq.missingPhone], ["Missing Email", dq.missingEmail], ["Missing Status", dq.missingStatus], ["Missing Group", dq.missingGroup], ["Missing State Officer (Column N)", dq.missingStateOfficer], ["Invalid Sales Value", dq.invalidSales], ["Invalid Reload Amount", dq.invalidAmount], ["Invalid Credit Balance", dq.invalidCredit]];
+  const [openMetric, setOpenMetric] = useState(null);
+  const dq = dataQuality.summary;
+  const rows = [
+    ["totalRecords", "Total Records"], ["validRecords", "Valid Records"],
+    ["incompleteRecords", "Incomplete Records"], ["duplicateEmailRecords", "Duplicate Email Records"],
+    ["duplicatePhoneRecords", "Duplicate Phone Records"], ["missingReloadDate", "Missing Reload Date"],
+    ["invalidReloadDate", "Invalid Reload Date"], ["noSales", "No Sales (Zero)"],
+    ["zeroCredit", "Zero Credit"], ["missingSchool", "Missing School Name"],
+    ["missingAgent", "Missing Agent Name"], ["missingPhone", "Missing Phone Number"],
+    ["missingEmail", "Missing Email"], ["missingStatus", "Missing Status"],
+    ["missingGroup", "Missing Group"], ["missingStateOfficer", "Missing State Officer (Column N)"],
+    ["invalidSales", "Invalid Sales Value"], ["invalidAmount", "Invalid Reload Amount"],
+    ["invalidCredit", "Invalid Credit Balance"],
+  ];
+  const getRecords = (key) => (key === "totalRecords" ? dataQuality.all : dataQuality.details[key] || []);
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 mb-1">Data Quality Summary</h1>
-      <p className="text-sm text-slate-500 mb-4">Semakan automatik ke atas data yang diimport. Tiada rekod dipadam secara automatik.</p>
+      <p className="text-sm text-slate-500 mb-4">Klik mana-mana metric untuk lihat senarai penuh dan muat turun sebagai Excel. Tiada rekod dipadam secara automatik.</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {rows.map(([label, value]) => (
-          <div key={label} className="bg-white border border-slate-200 rounded-lg p-3.5 flex items-center justify-between">
+        {rows.map(([key, label]) => (
+          <button key={key} onClick={() => setOpenMetric({ key, label })} className="bg-white border border-slate-200 rounded-lg p-3.5 flex items-center justify-between text-left hover:border-slate-400 transition-colors">
             <span className="text-sm text-slate-600">{label}</span>
-            <span className={`text-sm font-semibold tabular-nums ${value > 0 && label !== "Total Records" && label !== "Valid Records" ? "text-amber-600" : "text-slate-900"}`}>{fmtNum(value)}</span>
-          </div>
+            <span className={`text-sm font-semibold tabular-nums ${dq[key] > 0 && key !== "totalRecords" && key !== "validRecords" ? "text-amber-600" : "text-slate-900"}`}>{fmtNum(dq[key])}</span>
+          </button>
         ))}
       </div>
+      {openMetric && <DataQualityDrilldownModal metric={openMetric} records={getRecords(openMetric.key)} onClose={() => setOpenMetric(null)} />}
     </div>
   );
 }
@@ -957,7 +1061,7 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 const MOBILE_NAV = ["dashboard", "action", "agents", "groups", "settings"];
-function Sidebar({ page, setPage, onReimport, agentCount, onExport }) {
+function Sidebar({ page, setPage, onReimport, agentCount, onExport, driveFile, onRefreshDrive }) {
   return (
     <div className="hidden lg:flex flex-col w-60 shrink-0 bg-slate-900 text-slate-300 h-screen sticky top-0">
       <div className="px-5 py-5 flex items-center gap-2.5 border-b border-slate-800">
@@ -972,6 +1076,13 @@ function Sidebar({ page, setPage, onReimport, agentCount, onExport }) {
       </nav>
       <div className="p-3 border-t border-slate-800 space-y-1">
         <div className="px-2 text-[11px] text-slate-500">{agentCount} agents loaded</div>
+        {driveFile && (
+          <div className="px-2 py-1.5 rounded-md bg-slate-800/60 mb-1">
+            <div className="text-[10px] text-slate-500 truncate">Sumber: Google Drive</div>
+            <div className="text-[11px] text-slate-300 truncate">{driveFile.name}</div>
+            <button onClick={onRefreshDrive} className="mt-1 text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1"><Icon name="refresh" size={11} /> Refresh dari Drive</button>
+          </div>
+        )}
         <button onClick={onExport} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-slate-400 hover:text-white rounded-md hover:bg-slate-800"><Icon name="upload" size={14} /> Export Excel Terkini</button>
         <button onClick={onReimport} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-slate-400 hover:text-white rounded-md hover:bg-slate-800"><Icon name="file" size={14} /> Import Excel Baru</button>
       </div>
@@ -1017,9 +1128,11 @@ function BottomNav({ page, setPage }) {
 ============================================================================ */
 function useGoogleDrive() {
   const [clientId, setClientId] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [token, setToken] = useState(null);
   const [status, setStatus] = useState("");
   const gisLoadingRef = useRef(false);
+  const gapiLoadingRef = useRef(false);
 
   const ensureGis = useCallback(() => {
     return new Promise((resolve, reject) => {
@@ -1034,6 +1147,25 @@ function useGoogleDrive() {
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("Gagal memuatkan Google Sign-In."));
+      document.head.appendChild(script);
+    });
+  }, []);
+
+  const ensurePicker = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      const loadPicker = () => { window.gapi.load("picker", { callback: resolve }); };
+      if (window.google?.picker) return resolve();
+      if (window.gapi) return loadPicker();
+      if (gapiLoadingRef.current) {
+        const check = setInterval(() => { if (window.gapi) { clearInterval(check); loadPicker(); } }, 150);
+        return;
+      }
+      gapiLoadingRef.current = true;
+      const script = document.createElement("script");
+      script.src = "https://apis.google.com/js/api.js";
+      script.async = true;
+      script.onload = loadPicker;
+      script.onerror = () => reject(new Error("Gagal memuatkan Google Picker."));
       document.head.appendChild(script);
     });
   }, []);
@@ -1057,6 +1189,43 @@ function useGoogleDrive() {
     }
   }, [clientId, ensureGis]);
 
+  const pickFile = useCallback(async (onPicked) => {
+    if (!token) { setStatus("Sila sign in ke Google dahulu."); return; }
+    if (!apiKey) { setStatus("Sila masukkan Google API Key dahulu."); return; }
+    try {
+      await ensurePicker();
+      const view = new window.google.picker.DocsView(window.google.picker.ViewId.DOCS)
+        .setIncludeFolders(false)
+        .setMimeTypes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel");
+      const picker = new window.google.picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(token)
+        .setDeveloperKey(apiKey)
+        .setCallback((data) => {
+          if (data.action === window.google.picker.Action.PICKED && data.docs?.[0]) {
+            const doc = data.docs[0];
+            onPicked({ id: doc.id, name: doc.name });
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    } catch (err) {
+      setStatus(err.message || "Gagal membuka Google Picker.");
+    }
+  }, [token, apiKey, ensurePicker]);
+
+  const fetchFileArrayBuffer = useCallback(async (fileId) => {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Gagal memuat turun fail dari Drive (${res.status}). Sign in semula jika sesi telah tamat.`);
+    return res.arrayBuffer();
+  }, [token]);
+
+  const fetchFileMeta = useCallback(async (fileId) => {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime,name`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("Gagal semak status fail Drive.");
+    return res.json();
+  }, [token]);
+
   const upload = useCallback(async (agents, followUps, officerEnabled) => {
     if (!token) return;
     setStatus("Memuat naik ke Google Drive...");
@@ -1068,7 +1237,15 @@ function useGoogleDrive() {
     }
   }, [token]);
 
-  return { clientId, setClientId, token, status, signIn, upload };
+  return { clientId, setClientId, apiKey, setApiKey, token, status, setStatus, signIn, upload, pickFile, fetchFileArrayBuffer, fetchFileMeta };
+}
+
+function parseWorkbookToRows(data) {
+  const workbook = XLSX.read(data, { type: "array" });
+  const targetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === SHEET_NAME.toLowerCase());
+  if (!targetName) throw new Error(`Worksheet "${SHEET_NAME}" tidak dijumpai. Sila gunakan fail yang mengandungi worksheet tersebut.`);
+  const ws = workbook.Sheets[targetName];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
 }
 
 function App() {
@@ -1084,26 +1261,62 @@ function App() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("priorityScore");
   const [sortDir, setSortDir] = useState("desc");
+  const [driveFile, setDriveFile] = useState(null);
+  const [driveModified, setDriveModified] = useState(null);
+  const [driveUpdateAvailable, setDriveUpdateAvailable] = useState(false);
   const gDrive = useGoogleDrive();
 
   const handleFile = useCallback((file) => {
-    setImportError(""); setFileName(file.name);
+    setImportError(""); setFileName(file.name); setDriveFile(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const targetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === SHEET_NAME.toLowerCase());
-        if (!targetName) { setImportError(`Worksheet "${SHEET_NAME}" tidak dijumpai. Sila gunakan fail yang mengandungi worksheet tersebut.`); setRawRows(null); return; }
-        const ws = workbook.Sheets[targetName];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+        const rows = parseWorkbookToRows(new Uint8Array(e.target.result));
         const test = extractRawRecords(rows);
         if (test.length === 0) { setImportError("Tiada rekod agent dijumpai bermula dari Row 11. Sila semak fail Excel anda."); setRawRows(null); return; }
         setRawRows(rows); setPage("dashboard");
-      } catch (err) { setImportError("Ralat membaca fail Excel. Sila pastikan format fail adalah .xlsx atau .xls yang sah."); setRawRows(null); }
+      } catch (err) { setImportError(err.message || "Ralat membaca fail Excel. Sila pastikan format fail adalah .xlsx atau .xls yang sah."); setRawRows(null); }
     };
     reader.readAsArrayBuffer(file);
   }, []);
+
+  const handleDrivePicked = useCallback(async ({ id, name }) => {
+    setImportError(""); setFileName(name);
+    try {
+      const buf = await gDrive.fetchFileArrayBuffer(id);
+      const rows = parseWorkbookToRows(new Uint8Array(buf));
+      const test = extractRawRecords(rows);
+      if (test.length === 0) { setImportError("Tiada rekod agent dijumpai bermula dari Row 11 dalam fail Drive ini."); return; }
+      setRawRows(rows);
+      setDriveFile({ id, name });
+      setDriveUpdateAvailable(false);
+      try { const meta = await gDrive.fetchFileMeta(id); setDriveModified(meta.modifiedTime); } catch {}
+      setPage("dashboard");
+    } catch (err) { setImportError(err.message || "Gagal mengimport fail daripada Google Drive."); }
+  }, [gDrive]);
+
+  const refreshFromDrive = useCallback(async () => {
+    if (!driveFile) return;
+    try {
+      const buf = await gDrive.fetchFileArrayBuffer(driveFile.id);
+      const rows = parseWorkbookToRows(new Uint8Array(buf));
+      setRawRows(rows);
+      setDriveUpdateAvailable(false);
+      const meta = await gDrive.fetchFileMeta(driveFile.id);
+      setDriveModified(meta.modifiedTime);
+    } catch (err) { setImportError(err.message || "Gagal refresh fail daripada Google Drive."); }
+  }, [driveFile, gDrive]);
+
+  useEffect(() => {
+    if (!driveFile || !gDrive.token) return;
+    const interval = setInterval(async () => {
+      try {
+        const meta = await gDrive.fetchFileMeta(driveFile.id);
+        if (driveModified && meta.modifiedTime !== driveModified) setDriveUpdateAvailable(true);
+      } catch {}
+    }, 3 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [driveFile, driveModified, gDrive]);
 
   const records = useMemo(() => (rawRows ? extractRawRecords(rawRows) : []), [rawRows]);
   const agents = useMemo(() => (records.length ? computeAgents(records, settings) : []), [records, settings]);
@@ -1114,15 +1327,21 @@ function App() {
   const updateFollowUp = useCallback((key, val) => setFollowUps((f) => ({ ...f, [key]: val })), []);
 
   if (!rawRows) {
-    return <div className="min-h-screen bg-slate-50 font-sans text-slate-900"><ImportPage onFile={handleFile} error={importError} fileName={fileName} /></div>;
+    return <div className="min-h-screen bg-slate-50 font-sans text-slate-900"><ImportPage onFile={handleFile} error={importError} fileName={fileName} gDrive={gDrive} onDrivePicked={handleDrivePicked} /></div>;
   }
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-      <Sidebar page={page} setPage={setPage} onReimport={() => setRawRows(null)} agentCount={agents.length} onExport={() => downloadExcel(filteredAgents, followUps, agents.some((a) => a.stateOfficer))} />
-      <MobileMenu open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} page={page} setPage={setPage} onReimport={() => setRawRows(null)} />
+      <Sidebar page={page} setPage={setPage} onReimport={() => { setRawRows(null); setDriveFile(null); }} agentCount={agents.length} onExport={() => downloadExcel(filteredAgents, followUps, agents.some((a) => a.stateOfficer))} driveFile={driveFile} onRefreshDrive={refreshFromDrive} />
+      <MobileMenu open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} page={page} setPage={setPage} onReimport={() => { setRawRows(null); setDriveFile(null); }} />
       <div className="flex-1 min-w-0 pb-16 lg:pb-0">
         <TopBar setMobileMenuOpen={setMobileMenuOpen} page={page} />
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+          {driveUpdateAvailable && (
+            <div className="mb-4 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between gap-3">
+              <span>Fail <span className="font-medium">{driveFile?.name}</span> di Google Drive telah dikemaskini.</span>
+              <button onClick={refreshFromDrive} className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700">Refresh Sekarang</button>
+            </div>
+          )}
           {page !== "settings" && page !== "quality" && (
             <React.Fragment>
               <FilterBar agents={agents} filters={filters} setFilters={setFilters} search={search} setSearch={setSearch} />
