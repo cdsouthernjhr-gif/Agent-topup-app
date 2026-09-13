@@ -1262,7 +1262,10 @@ function useGoogleDrive() {
 function parseWorkbookToRows(data) {
   const workbook = XLSX.read(data, { type: "array" });
   const targetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === SHEET_NAME.toLowerCase());
-  if (!targetName) throw new Error(`Worksheet "${SHEET_NAME}" tidak dijumpai. Sila gunakan fail yang mengandungi worksheet tersebut.`);
+  if (!targetName) {
+    const found = workbook.SheetNames.length ? workbook.SheetNames.join(", ") : "(tiada worksheet dijumpai dalam fail ini)";
+    throw new Error(`Worksheet "${SHEET_NAME}" tidak dijumpai. Worksheet yang wujud dalam fail ini: ${found}. Sila pastikan anda memilih fail data induk yang betul, bukan fail hasil Export/Upload aplikasi ini.`);
+  }
   const ws = workbook.Sheets[targetName];
   return XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
 }
