@@ -649,7 +649,7 @@ function ImportPage({ onFile, error, fileName, gDrive, onDrivePicked }) {
               <button disabled={!canPick} onClick={() => gDrive.pickFile(onDrivePicked)} className="flex-1 text-sm font-medium px-3 py-2 rounded-md bg-slate-900 text-white disabled:opacity-40 hover:bg-slate-700">Pilih Fail dari Drive</button>
             </div>
             {gDrive.status && <div className="text-xs text-slate-500">{gDrive.status}</div>}
-            <div className="text-xs text-slate-400 leading-relaxed">Perlukan Google Cloud project dengan "Google Picker API" diaktifkan, dan satu API Key (Credentials → Create Credentials → API Key). OAuth Client ID sama seperti untuk Upload ke Drive.</div>
+            <div className="text-xs text-slate-400 leading-relaxed">Perlukan Google Cloud project dengan "Google Picker API" diaktifkan, dan satu API Key (Credentials → Create Credentials → API Key). OAuth Client ID sama seperti untuk Upload ke Drive.<br /><br />App ini akan detect secara automatik jika fail anda ditukar Google Drive kepada format Google Sheets native, dan export ke Excel terlebih dahulu sebelum dibaca. Pastikan sahaja tab worksheet di dalam fail tersebut masih dinamakan tepat <span className="font-medium text-slate-600">"{SHEET_NAME}"</span>.</div>
           </div>
         )}
       </div>
@@ -1196,7 +1196,7 @@ function useGoogleDrive() {
       await ensurePicker();
       const view = new window.google.picker.DocsView(window.google.picker.ViewId.DOCS)
         .setIncludeFolders(false)
-        .setMimeTypes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel");
+        .setMimeTypes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.google-apps.spreadsheet");
       const picker = new window.google.picker.PickerBuilder()
         .addView(view)
         .setOAuthToken(token)
@@ -1204,7 +1204,7 @@ function useGoogleDrive() {
         .setCallback((data) => {
           if (data.action === window.google.picker.Action.PICKED && data.docs?.[0]) {
             const doc = data.docs[0];
-            onPicked({ id: doc.id, name: doc.name });
+            onPicked({ id: doc.id, name: doc.name, mimeType: doc.mimeType });
           }
         })
         .build();
@@ -1214,14 +1214,20 @@ function useGoogleDrive() {
     }
   }, [token, apiKey, ensurePicker]);
 
-  const fetchFileArrayBuffer = useCallback(async (fileId) => {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
+  // Native Google Sheets files (created via "New > Google Sheets", or auto-converted by
+  // Drive's "Convert uploads" setting) are NOT binary xlsx — must use /export, not alt=media.
+  const fetchFileArrayBuffer = useCallback(async (fileId, mimeType) => {
+    const isNativeSheet = mimeType === "application/vnd.google-apps.spreadsheet";
+    const url = isNativeSheet
+      ? `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}`
+      : `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error(`Gagal memuat turun fail dari Drive (${res.status}). Sign in semula jika sesi telah tamat.`);
     return res.arrayBuffer();
   }, [token]);
 
   const fetchFileMeta = useCallback(async (fileId) => {
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime,name`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime,name,mimeType`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error("Gagal semak status fail Drive.");
     return res.json();
   }, [token]);
@@ -1280,15 +1286,15 @@ function App() {
     reader.readAsArrayBuffer(file);
   }, []);
 
-  const handleDrivePicked = useCallback(async ({ id, name }) => {
+  const handleDrivePicked = useCallback(async ({ id, name, mimeType }) => {
     setImportError(""); setFileName(name);
     try {
-      const buf = await gDrive.fetchFileArrayBuffer(id);
+      const buf = await gDrive.fetchFileArrayBuffer(id, mimeType);
       const rows = parseWorkbookToRows(new Uint8Array(buf));
       const test = extractRawRecords(rows);
-      if (test.length === 0) { setImportError("Tiada rekod agent dijumpai bermula dari Row 11 dalam fail Drive ini."); return; }
+      if (test.length === 0) { setImportError(`Tiada rekod agent dijumpai bermula dari Row 11. Pastikan fail Drive ini mempunyai worksheet bernama "${SHEET_NAME}" tepat seperti fail asal.`); return; }
       setRawRows(rows);
-      setDriveFile({ id, name });
+      setDriveFile({ id, name, mimeType });
       setDriveUpdateAvailable(false);
       try { const meta = await gDrive.fetchFileMeta(id); setDriveModified(meta.modifiedTime); } catch {}
       setPage("dashboard");
@@ -1298,7 +1304,7 @@ function App() {
   const refreshFromDrive = useCallback(async () => {
     if (!driveFile) return;
     try {
-      const buf = await gDrive.fetchFileArrayBuffer(driveFile.id);
+      const buf = await gDrive.fetchFileArrayBuffer(driveFile.id, driveFile.mimeType);
       const rows = parseWorkbookToRows(new Uint8Array(buf));
       setRawRows(rows);
       setDriveUpdateAvailable(false);
