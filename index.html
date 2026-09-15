@@ -64,7 +64,7 @@ function Icon({ name, size = 16, className = "" }) {
 ============================================================================ */
 const SHEET_NAME = "TOPUP APPS AGENT";
 const DATA_START_ROW_INDEX = 10; // Row 11
-const COL = { EMAIL: 1, STATUS: 4, AGENT: 6, PHONE: 7, SCHOOL: 12, SALES: 14, GROUP: 16, CREDIT: 17, RELOAD_DATE: 18, RELOAD_AMT: 19, STATE_OFFICER: 13 };
+const COL = { EMAIL: 1, STATUS: 4, AGENT: 6, PHONE: 7, SCHOOL: 12, SALES: 14, GROUP: 16, CREDIT: 17, RELOAD_DATE: 18, RELOAD_AMT: 19, STATE_OFFICER: 13, REMARK: 21 };
 
 
 const ACTIVITY_META = {
@@ -151,6 +151,34 @@ function parseDateVal(raw) {
   }
   return { date: null, empty: false, invalid: true };
 }
+function normalizePhone(raw) {
+  const original = String(raw ?? "").trim();
+  if (!original) return { e164: "", digits: "", valid: false, issue: "Tiada nombor" };
+  if (/e\+?\d+$/i.test(original.replace(/\s/g, ""))) {
+    return { e164: "", digits: "", valid: false, issue: "Nombor kemungkinan telah dipendekkan/ditukar Excel (scientific notation)" };
+  }
+  let cleaned = original.replace(/[^\d+]/g, "");
+  let digits = cleaned.replace(/\+/g, "");
+  if (!digits) return { e164: "", digits: "", valid: false, issue: "Format tidak dikenali" };
+  if (digits.startsWith("60")) {
+    // already has country code
+  } else if (digits.startsWith("0")) {
+    digits = "60" + digits.slice(1);
+  } else {
+    digits = "60" + digits;
+  }
+  const nsn = digits.slice(2);
+  const isMobile = /^1\d{7,9}$/.test(nsn);
+  const isLandline = /^[3-9]\d{6,8}$/.test(nsn);
+  const valid = isMobile || isLandline;
+  return {
+    e164: "+" + digits,
+    digits,
+    valid,
+    issue: valid ? "" : `Panjang/format nombor tidak lazim untuk Malaysia (${nsn.length} digit selepas kod negara +60) — sila semak data asal`,
+  };
+}
+
 function percentileRank(sortedAsc, value) {
   if (!sortedAsc.length) return 0;
   let count = 0;
@@ -170,13 +198,16 @@ function extractRawRecords(rows) {
       group = cell(row, COL.GROUP), creditRaw = cell(row, COL.CREDIT), reloadDateRaw = cell(row, COL.RELOAD_DATE),
       reloadAmtRaw = cell(row, COL.RELOAD_AMT);
     const stateOfficer = cell(row, COL.STATE_OFFICER);
+    const remark = cell(row, COL.REMARK);
     const isBlankRow = ![email, status, agentName, phoneNumber, schoolName, salesRaw, group, creditRaw, reloadDateRaw, reloadAmtRaw].some((v) => v !== "");
     if (isBlankRow) continue;
     const totalSales = parseNumberVal(salesRaw), creditBalance = parseNumberVal(creditRaw), lastReloadAmount = parseNumberVal(reloadAmtRaw);
     const dateInfo = parseDateVal(reloadDateRaw);
+    const phoneInfo = normalizePhone(phoneNumber);
     records.push({
       rowIndex: i + 1, key: `${email || ""}|${phoneNumber || ""}|${agentName || ""}|${i}`,
-      schoolName, agentName, phoneNumber, status, email, group, stateOfficer,
+      schoolName, agentName, phoneNumber, status, email, group, stateOfficer, remark,
+      phoneE164: phoneInfo.e164, phoneDigits: phoneInfo.digits, phoneValid: phoneInfo.valid, phoneIssue: phoneInfo.issue,
       totalSales, creditBalance, lastReloadAmount,
       lastReloadDate: dateInfo.date, reloadDateEmpty: dateInfo.empty, reloadDateInvalid: dateInfo.invalid,
       _raw: { salesRaw, creditRaw, reloadAmtRaw, reloadDateRaw },
@@ -195,13 +226,14 @@ function computeDataQuality(records) {
     missingStatus: [], missingGroup: [], missingStateOfficer: [],
     invalidSales: [], invalidCredit: [], invalidAmount: [], invalidReloadDate: [],
     noSales: [], zeroCredit: [], duplicateEmailRecords: [], duplicatePhoneRecords: [],
-    incompleteRecords: [], validRecords: [], missingReloadDate: [],
+    incompleteRecords: [], validRecords: [], missingReloadDate: [], invalidPhoneFormat: [],
   };
   records.forEach((r) => {
     let bad = false;
     if (!r.schoolName) { details.missingSchool.push(r); bad = true; }
     if (!r.agentName) { details.missingAgent.push(r); bad = true; }
     if (!r.phoneNumber) { details.missingPhone.push(r); bad = true; }
+    if (r.phoneNumber && !r.phoneValid) { details.invalidPhoneFormat.push(r); bad = true; }
     if (!r.email) { details.missingEmail.push(r); bad = true; }
     if (!r.status) { details.missingStatus.push(r); bad = true; }
     if (!r.group) { details.missingGroup.push(r); bad = true; }
@@ -237,6 +269,7 @@ function computeDataQuality(records) {
     invalidSales: details.invalidSales.length,
     invalidAmount: details.invalidAmount.length,
     invalidCredit: details.invalidCredit.length,
+    invalidPhoneFormat: details.invalidPhoneFormat.length,
   };
   return { summary, details, all: records };
 }
@@ -450,7 +483,8 @@ function KpiCard({ label, value, sub, color = "slate", icon }) {
 }
 function fmtMoney(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return "RM " + n.toLocaleString("en-MY", { maximumFractionDigits: 0 }); }
 function fmtNum(n) { if (n === null || n === undefined || isNaN(n)) return "—"; return n.toLocaleString("en-MY"); }
-function waLink(phone) { const digits = (phone || "").replace(/[^0-9]/g, ""); const normalized = digits.startsWith("0") ? "6" + digits : digits; return `https://wa.me/${normalized}`; }
+function waLink(phone) { const n = normalizePhone(phone); const digits = n.digits || (phone || "").replace(/[^0-9]/g, ""); return `https://wa.me/${digits}`; }
+function telLink(phone) { const n = normalizePhone(phone); return n.e164 || phone || ""; }
 
 function SimpleBarChartH({ data }) {
   const max = Math.max(...data.map((d) => d.value), 1);
@@ -504,8 +538,12 @@ function AgentActionCard({ agent, onOpen }) {
         <Badge color={ACTIVITY_META[agent.activityStatus].color}>{ACTIVITY_META[agent.activityStatus].label}</Badge>
       </div>
       {agent.actionReason && <div className="text-xs text-slate-500 mt-2.5 leading-relaxed">{agent.actionReason}</div>}
+      <div className="flex items-center gap-1.5 mt-2.5 text-xs">
+        <span className="text-slate-600 font-medium tabular-nums">{agent.phoneE164 || agent.phoneNumber || "—"}</span>
+        {!agent.phoneValid && agent.phoneNumber && <Badge color="amber">Semak Nombor</Badge>}
+      </div>
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-        <a href={`tel:${agent.phoneNumber}`} className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={13} /> Call</a>
+        <a href={`tel:${telLink(agent.phoneNumber)}`} className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={13} /> Call</a>
         <a href={waLink(agent.phoneNumber)} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"><Icon name="message" size={13} /> WhatsApp</a>
         <div className="ml-auto flex items-center gap-1 text-xs text-slate-500"><Icon name={actMeta.icon} size={13} /> {actMeta.label}</div>
       </div>
@@ -528,12 +566,26 @@ function AgentProfileModal({ agent, onClose, followUp, onUpdateFollowUp }) {
           <div>
             <div className="text-xs font-medium text-slate-500 mb-2">BASIC INFORMATION</div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <Info label="Phone" value={agent.phoneNumber || "—"} />
+              <Info label="Phone" value={
+                <span className="flex items-center gap-1.5">
+                  <span className="tabular-nums">{agent.phoneE164 || agent.phoneNumber || "—"}</span>
+                  {agent.phoneNumber && (agent.phoneValid ? <Badge color="emerald">Sah</Badge> : <Badge color="amber">Semak</Badge>)}
+                </span>
+              } />
               <Info label="Email" value={agent.email || "—"} />
               <Info label="Status" value={agent.status || "—"} />
               <Info label="Group" value={agent.group || "—"} />
               {agent.stateOfficer !== undefined && agent.stateOfficer !== "" && <Info label="State Officer" value={agent.stateOfficer} />}
             </div>
+            {agent.phoneNumber && !agent.phoneValid && (
+              <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">{agent.phoneIssue}</div>
+            )}
+            {agent.remark && (
+              <div className="mt-3">
+                <div className="text-xs text-slate-400">Remark (Column V)</div>
+                <div className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap">{agent.remark}</div>
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs font-medium text-slate-500 mb-2">SALES & RELOAD</div>
@@ -574,7 +626,7 @@ function AgentProfileModal({ agent, onClose, followUp, onUpdateFollowUp }) {
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <a href={`tel:${agent.phoneNumber}`} className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={15} /> Call</a>
+            <a href={`tel:${telLink(agent.phoneNumber)}`} className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-md bg-slate-900 text-white hover:bg-slate-700"><Icon name="phone" size={15} /> Call</a>
             <a href={waLink(agent.phoneNumber)} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"><Icon name="message" size={15} /> WhatsApp</a>
           </div>
         </div>
@@ -624,7 +676,7 @@ function applyFilters(agents, filters, search) {
     if (filters.priorityLevel && a.priorityLevel !== filters.priorityLevel) return false;
     if (filters.creditLevel && a.creditLevel !== filters.creditLevel) return false;
     if (filters.stateOfficer && a.stateOfficer !== filters.stateOfficer) return false;
-    if (search) { const q = search.toLowerCase(); const hay = `${a.schoolName} ${a.agentName} ${a.phoneNumber} ${a.email} ${a.stateOfficer}`.toLowerCase(); if (!hay.includes(q)) return false; }
+    if (search) { const q = search.toLowerCase(); const hay = `${a.schoolName} ${a.agentName} ${a.phoneNumber} ${a.phoneE164} ${a.email} ${a.stateOfficer} ${a.remark}`.toLowerCase(); if (!hay.includes(q)) return false; }
     return true;
   });
 }
@@ -794,9 +846,9 @@ function AgentsPage({ agents, onOpenAgent, sortKey, setSortKey, sortDir, setSort
     <div>
       <div className="flex items-center justify-between mb-4"><h1 className="text-lg font-semibold text-slate-900">Agents <span className="text-slate-400 font-normal text-sm">({sorted.length})</span></h1></div>
       <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
-        <table className="w-full text-sm min-w-[980px]">
+        <table className="w-full text-sm min-w-[1080px]">
           <thead><tr className="text-xs text-slate-400 border-b border-slate-100">
-            <Th label="Agent" k="agentName" /><Th label="School" k="schoolName" /><Th label="Group" k="group" /><Th label="Officer" k="stateOfficer" /><Th label="Status" k="status" />
+            <Th label="Agent" k="agentName" /><Th label="School" k="schoolName" /><Th label="Phone" k="phoneE164" /><Th label="Group" k="group" /><Th label="Officer" k="stateOfficer" /><Th label="Status" k="status" />
             <Th label="Sales" k="totalSales" className="text-right" /><Th label="Credit" k="creditBalance" className="text-right" />
             <Th label="Days Since Reload" k="daysSinceLastReload" className="text-right" /><Th label="Activity" k="activityStatus" />
             <Th label="Priority" k="priorityScore" className="text-right" /><th className="text-right font-medium px-3 py-2">Action</th>
@@ -805,6 +857,12 @@ function AgentsPage({ agents, onOpenAgent, sortKey, setSortKey, sortDir, setSort
             <tr key={a.key} className="border-b border-slate-50 hover:bg-slate-50 cursor-pointer" onClick={() => onOpenAgent(a)}>
               <td className="px-3 py-2.5 font-medium text-slate-800 whitespace-nowrap">{a.agentName || "—"}</td>
               <td className="px-3 py-2.5 text-slate-500 max-w-[180px] truncate">{a.schoolName || "—"}</td>
+              <td className="px-3 py-2.5 text-slate-600 tabular-nums whitespace-nowrap">
+                <span className="inline-flex items-center gap-1">
+                  {a.phoneE164 || a.phoneNumber || "—"}
+                  {a.phoneNumber && !a.phoneValid && <Icon name="alertTriangle" size={12} className="text-amber-500 shrink-0" />}
+                </span>
+              </td>
               <td className="px-3 py-2.5 text-slate-500">{a.group || "—"}</td>
               <td className="px-3 py-2.5 text-slate-500">{a.stateOfficer || "—"}</td>
               <td className="px-3 py-2.5 text-slate-500">{a.status || "—"}</td>
@@ -814,7 +872,7 @@ function AgentsPage({ agents, onOpenAgent, sortKey, setSortKey, sortDir, setSort
               <td className="px-3 py-2.5"><Badge color={ACTIVITY_META[a.activityStatus].color}>{ACTIVITY_META[a.activityStatus].label}</Badge></td>
               <td className="px-3 py-2.5 text-right"><Badge color={PRIORITY_META[a.priorityLevel].color}>{a.priorityScore}</Badge></td>
               <td className="px-3 py-2.5 text-right"><div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <a href={`tel:${a.phoneNumber}`} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200"><Icon name="phone" size={13} /></a>
+                <a href={`tel:${telLink(a.phoneNumber)}`} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200"><Icon name="phone" size={13} /></a>
                 <a href={waLink(a.phoneNumber)} target="_blank" rel="noreferrer" className="p-1.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-700"><Icon name="message" size={13} /></a>
               </div></td>
             </tr>
@@ -954,7 +1012,7 @@ function DataQualityPage({ dataQuality }) {
     ["missingEmail", "Missing Email"], ["missingStatus", "Missing Status"],
     ["missingGroup", "Missing Group"], ["missingStateOfficer", "Missing State Officer (Column N)"],
     ["invalidSales", "Invalid Sales Value"], ["invalidAmount", "Invalid Reload Amount"],
-    ["invalidCredit", "Invalid Credit Balance"],
+    ["invalidCredit", "Invalid Credit Balance"], ["invalidPhoneFormat", "Invalid/Suspicious Phone Format"],
   ];
   const getRecords = (key) => (key === "totalRecords" ? dataQuality.all : dataQuality.details[key] || []);
   return (
